@@ -1,0 +1,173 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "forms": {
+    "verifyUser": "/internal/form/verify-user-submit"
+  },
+  "menu": {
+    "items": [
+      {
+        "description": "Verify a redditor's history and approve them as a contributor if they pass.",
+        "endpoint": "/internal/menu/verify-user",
+        "forUserType": "moderator",
+        "label": "Verify a user",
+        "location": "subreddit"
+      },
+      {
+        "description": "Verify the author of this comment and approve them if they pass.",
+        "endpoint": "/internal/menu/verify-comment-author",
+        "forUserType": "moderator",
+        "label": "Verify comment author",
+        "location": "comment"
+      },
+      {
+        "description": "Verify the author of this post and approve them if they pass.",
+        "endpoint": "/internal/menu/verify-post-author",
+        "forUserType": "moderator",
+        "label": "Verify post author",
+        "location": "post"
+      },
+      {
+        "description": "Tally commenters across recent submissions; posts the report to Mod Discussions.",
+        "endpoint": "/internal/menu/list-active-users",
+        "forUserType": "moderator",
+        "label": "List recently active users",
+        "location": "subreddit"
+      },
+      {
+        "description": "Tally users with Reddit/anti-evil removals; posts the report to Mod Discussions.",
+        "endpoint": "/internal/menu/list-admin-removed",
+        "forUserType": "moderator",
+        "label": "List users with admin-removed items",
+        "location": "subreddit"
+      },
+      {
+        "description": "Posts a snapshot of the latest verification events to Mod Discussions.",
+        "endpoint": "/internal/menu/view-activity",
+        "forUserType": "moderator",
+        "label": "View recent verification activity",
+        "location": "subreddit"
+      }
+    ]
+  },
+  "name": "substeward",
+  "permissions": {
+    "reddit": {
+      "enable": true,
+      "scope": "moderator"
+    },
+    "redis": true
+  },
+  "scheduler": {
+    "tasks": {
+      "verificationWatchdog": {
+        "cron": "*/5 * * * *",
+        "endpoint": "/internal/scheduler/verification-watchdog"
+      },
+      "verifyUser": {
+        "endpoint": "/internal/scheduler/verify-user"
+      }
+    }
+  },
+  "scripts": {
+    "build": "npm run build",
+    "dev": "npm run build:watch"
+  },
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.cjs"
+  },
+  "settings": {
+    "subreddit": {
+      "analysisModLogLimit": {
+        "defaultValue": 500,
+        "helpText": "How many recent moderation-log entries to scan for the 'admin-removed items' report.",
+        "label": "Analysis — admin-removed: mod-log entries to scan",
+        "type": "number"
+      },
+      "analysisSubmissionLimit": {
+        "defaultValue": 100,
+        "helpText": "How many recent submissions to scan for the 'recently active users' report.",
+        "label": "Analysis — active users: submissions to scan",
+        "type": "number"
+      },
+      "verificationMinKarmaAverage": {
+        "defaultValue": 1,
+        "helpText": "Reject users whose average comment score in this subreddit is below this value.",
+        "label": "Verification — minimum average comment karma",
+        "type": "number",
+        "validationEndpoint": "/internal/settings/validate-min-karma-average"
+      },
+      "verificationOldestCommentDays": {
+        "defaultValue": 182,
+        "helpText": "A user's oldest comment in this subreddit must be at least this many days old. Set to 0 to disable the age requirement.",
+        "label": "Verification — oldest comment age (days)",
+        "type": "number",
+        "validationEndpoint": "/internal/settings/validate-oldest-comment-days"
+      },
+      "verificationSubredditsToShow": {
+        "defaultValue": 10,
+        "label": "Verification — top subreddits in report",
+        "type": "number",
+        "validationEndpoint": "/internal/settings/validate-subreddits-to-show"
+      },
+      "verificationTimezone": {
+        "defaultValue": "UTC",
+        "helpText": "Timezone used to format dates in verification reports.",
+        "label": "Verification — report timezone",
+        "options": [
+          { "label": "UTC", "value": "UTC" },
+          {
+            "label": "US Eastern (America/New_York)",
+            "value": "America/New_York"
+          },
+          {
+            "label": "US Central (America/Chicago)",
+            "value": "America/Chicago"
+          },
+          {
+            "label": "US Mountain (America/Denver)",
+            "value": "America/Denver"
+          },
+          {
+            "label": "US Arizona, no DST (America/Phoenix)",
+            "value": "America/Phoenix"
+          },
+          {
+            "label": "US Pacific (America/Los_Angeles)",
+            "value": "America/Los_Angeles"
+          },
+          {
+            "label": "US Alaska (America/Anchorage)",
+            "value": "America/Anchorage"
+          },
+          {
+            "label": "US Hawaii (Pacific/Honolulu)",
+            "value": "Pacific/Honolulu"
+          },
+          {
+            "label": "Canada Eastern (America/Toronto)",
+            "value": "America/Toronto"
+          },
+          {
+            "label": "Brazil (America/Sao_Paulo)",
+            "value": "America/Sao_Paulo"
+          },
+          { "label": "UK (Europe/London)", "value": "Europe/London" },
+          { "label": "Central Europe (Europe/Paris)", "value": "Europe/Paris" },
+          {
+            "label": "Eastern Europe (Europe/Athens)",
+            "value": "Europe/Athens"
+          },
+          { "label": "India (Asia/Kolkata)", "value": "Asia/Kolkata" },
+          { "label": "China (Asia/Shanghai)", "value": "Asia/Shanghai" },
+          { "label": "Japan (Asia/Tokyo)", "value": "Asia/Tokyo" },
+          {
+            "label": "Australia Eastern (Australia/Sydney)",
+            "value": "Australia/Sydney"
+          }
+        ],
+        "type": "select"
+      }
+    }
+  }
+}
