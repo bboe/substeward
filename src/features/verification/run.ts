@@ -4,6 +4,7 @@ import {
   checkNotes,
   checkStatus,
   formatFailure,
+  formatFailureWithSummary,
   formatResults,
   markerFrom,
   processComments,
@@ -11,6 +12,7 @@ import {
   type VerificationConfig,
 } from './evaluate.js';
 import { recordActivity } from './activity.js';
+import { recordVerification } from './cache.js';
 import { deliverReport, notifyModerators } from './report.js';
 import {
   getVerificationSettings,
@@ -317,7 +319,16 @@ async function stepFinalize(state: RunState): Promise<void> {
     timezone: settings.timezone,
   });
   if (commentsError) {
-    await finalizeFail(state, commentsError);
+    // Include the activity summary so moderators see the breakdown on failure.
+    const failReport = formatFailureWithSummary({
+      username: state.username,
+      error: commentsError,
+      createdAt: new Date(state.createdAtIso ?? state.startedAtIso),
+      stats,
+      noteTypeCounts: state.noteTypeCounts,
+      config,
+    });
+    await finalizeFail(state, commentsError, failReport);
     return;
   }
 
@@ -348,7 +359,10 @@ async function stepFinalize(state: RunState): Promise<void> {
   await deliverReport(report);
   if (approved) {
     await recordActivity({ username: state.username, status: 'pass' });
+    // Cache the successful verification for the re-verify prompt.
+    await recordVerification(state.username, 'pass');
   } else {
+    // Don't cache approve failures so the moderator can retry without a prompt.
     await recordActivity({
       username: state.username,
       status: 'approve-failed',
@@ -361,14 +375,20 @@ async function stepFinalize(state: RunState): Promise<void> {
   await finishRun(state.runId);
 }
 
-// Deliver a failure report, record it, and end the run.
-async function finalizeFail(state: RunState, error: string): Promise<void> {
-  await deliverReport(formatFailure(state.username, error));
+// Deliver a failure report, record it, and end the run. An optional report
+// override lets callers include the activity summary on comment-stage failures.
+async function finalizeFail(
+  state: RunState,
+  error: string,
+  report?: string
+): Promise<void> {
+  await deliverReport(report ?? formatFailure(state.username, error));
   await recordActivity({
     username: state.username,
     status: 'fail',
     detail: error,
   });
+  await recordVerification(state.username, 'fail');
   console.log(`[verification] u/${state.username}: FAIL (${error})`);
   await finishRun(state.runId);
 }

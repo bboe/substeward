@@ -36,12 +36,13 @@ src/
 │       ├── verification.ts     # Low-level Reddit fetch helpers (user/notes/comment pages)
 │       ├── run.ts              # Chunked run engine: steps, retries, watchdog
 │       ├── report.ts           # Modmail report delivery + moderator alerts
-│       ├── process.ts          # Entry points: queue a run, resolve comment/post authors
+│       ├── cache.ts            # Redis recency cache (re-verify prompt)
+│       ├── process.ts          # Pre-checks (skip/confirm) + run queuing
+│       ├── forms.ts            # Verify/confirm forms + UI mapping
 │       ├── analysis.ts         # Active-users + admin-removed tallies (unit tested)
 │       ├── activity.ts         # Redis-backed moderator activity feed
 │       ├── settings.ts         # Settings reading + validation
-│       ├── username.ts         # Username normalization/validation
-│       └── forms.ts            # Verify-user form + submit handler
+│       └── username.ts         # Username normalization/validation
 └── routes/
     ├── forms.ts                # Form submit route handlers
     ├── menu.ts                 # Menu action route handlers
@@ -59,9 +60,21 @@ All behavior is configured via subreddit install settings (in `devvit.json` unde
 
 - `npm run dev`: Starts development mode with live reload on your test subreddit
 - `npm run build`: Builds the app
-- `npm test`: Runs lint, type-check, and unit tests
+- `npm test`: Runs lint, type-check, unit tests, and harness tests
+- `npm run test:unit`: Pure-logic unit tests (`node:test`)
+- `npm run test:harness`: Integration tests against mocked Devvit capabilities (`vitest` + `@devvit/test`)
 - `npm run deploy`: Uploads a new version of the app to Reddit
 - `npm run launch`: Publishes the app for review and public use
+
+## Testing
+
+Two complementary suites:
+
+- **Unit (`node:test`)** — `*.test.ts`: pure logic (verification rules, report formatting,
+  validators, tallies, helpers).
+- **Harness (`vitest` + `@devvit/test`)** — `*.devvit.test.ts`: the stateful engine against a mocked
+  Redis/Scheduler/Settings with the Reddit API stubbed — covers the chunked run (pass/fail/retry/
+  watchdog), the recency cache, and the pre-checks (skip/confirm).
 
 ## Permissions
 

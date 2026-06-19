@@ -16,7 +16,9 @@ event-driven moderator menu actions.
   - no `BAN` or `MUTE` mod notes
   - account is found and not suspended
 - On pass: approves the user as a contributor and posts a markdown report.
-- On fail: posts a failure report explaining the reason.
+- On fail: posts a failure report explaining the reason. For failures that occur after comment
+  history is gathered (no in-sub history / oldest comment too recent / low karma), the report also
+  includes the subreddit-activity summary so moderators see the breakdown.
 - Every report is posted as an internal note to an auto-created Mod Discussions thread (see
   "Where the report goes").
 
@@ -30,6 +32,17 @@ Each action **queues a background run** (`scheduler.runJob` → `/internal/sched
 returns immediately with a toast. The actual fetching, evaluation, approval, and report delivery run
 in the background, so the moderator is never left waiting on a spinner. The result lands in modmail
 (see below).
+
+### Pre-checks (before a run is queued)
+
+Two guards run synchronously when a moderator triggers verification:
+
+- **Already an approved contributor** → verification is **skipped** with a toast (no point re-checking
+  someone already approved). Uses a single username-filtered `getApprovedUsers` lookup.
+- **Verified within the last 7 days** → a **confirmation form** ("Re-verify user?") is shown with how
+  long ago and the prior result; only on confirm is the run queued. Recency is tracked in Redis with a
+  rolling 7-day TTL (`verification:last:<username>`); pass and fail results are recorded, approve
+  failures are not (so they can be retried without a prompt).
 
 ### Chunked execution (why it's a run, not a single job)
 
@@ -115,12 +128,13 @@ Both post their results to **Mod Discussions** and are bounded by `analysisSubmi
 - `run.ts` — the chunked run engine: init/fetch/finalize steps, per-step retries, hard-failure
   handling, and the watchdog (pure helpers `shouldStopFetching`/`isStale` are unit tested).
 - `report.ts` — modmail delivery, report-conversation resolution/auto-creation, and moderator alerts.
-- `process.ts` — entry points: queue a run and build the toast; resolve comment/post authors.
+- `cache.ts` — Redis recency cache (7-day TTL) + `describeAge` for the re-verify prompt.
+- `process.ts` — pre-checks (approved-contributor skip, recency confirm) and run queuing.
+- `forms.ts` — verify/confirm forms and the UI mapping for all entry points.
 - `analysis.ts` — active-users and admin-removed tallies (pure helpers unit tested).
 - `activity.ts` — Redis-backed moderator activity feed.
 - `settings.ts` — reads/validates all verification + analysis settings.
 - `username.ts` — username normalization/validation.
-- `forms.ts` — the verify-user form and its submit handler.
 
 The run engine is driven via `src/routes/scheduler.ts` — the `verifyUser` (per-step) and
 `verificationWatchdog` (cron) tasks declared in `devvit.json`.

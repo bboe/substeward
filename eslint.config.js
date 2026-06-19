@@ -4,7 +4,9 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig([
   {
-    ignores: ['dist/', 'node_modules/'],
+    // Harness tests run under vitest and are excluded from tsconfig, so the
+    // type-checked lint rules can't resolve them; vitest validates them instead.
+    ignores: ['dist/', 'node_modules/', 'src/**/*.devvit.test.ts'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

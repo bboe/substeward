@@ -13,6 +13,20 @@ export async function fetchUser(
   return { exists: Boolean(user), createdAt: user?.createdAt };
 }
 
+// True when the user is already an approved contributor of the subreddit.
+// Uses the username filter so this is a single, cheap lookup.
+export async function isApprovedContributor(
+  subredditName: string,
+  username: string
+): Promise<boolean> {
+  const users = await reddit
+    .getApprovedUsers({ subredditName, username })
+    .all();
+  return users.some(
+    (user) => user.username.toLowerCase() === username.toLowerCase()
+  );
+}
+
 // Fetch every mod note for the user and tally counts by note type.
 export async function collectNoteCounts(
   subredditName: string,

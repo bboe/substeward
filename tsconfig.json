@@ -25,6 +25,6 @@
     "tsBuildInfoFile": "dist/types/tsconfig.tsbuildinfo",
     "types": ["node"]
   },
-  "exclude": ["dist/", "node_modules/"],
+  "exclude": ["dist/", "node_modules/", "src/**/*.devvit.test.ts"],
   "include": ["src/**/*", "vite.config.ts"]
 }

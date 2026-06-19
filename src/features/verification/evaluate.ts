@@ -235,3 +235,24 @@ export function formatResults(opts: {
 export function formatFailure(username: string, error: string): string {
   return `u/${username}: verification fail\n\nAccount ${error}`;
 }
+
+// Failure body that also includes the activity summary. Used for failures that
+// occur after comment history is gathered (e.g. no in-subreddit history, oldest
+// comment too recent, low karma) so moderators still see the user's breakdown.
+export function formatFailureWithSummary(opts: {
+  username: string;
+  error: string;
+  createdAt: Date;
+  stats: CommentStats;
+  noteTypeCounts: Record<ModNoteType, number>;
+  config: VerificationConfig;
+}): string {
+  const summary = formatResults({
+    username: opts.username,
+    createdAt: opts.createdAt,
+    stats: opts.stats,
+    noteTypeCounts: opts.noteTypeCounts,
+    config: opts.config,
+  });
+  return `${formatFailure(opts.username, opts.error)}\n\n${summary}`;
+}

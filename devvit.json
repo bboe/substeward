@@ -1,7 +1,8 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
   "forms": {
-    "verifyUser": "/internal/form/verify-user-submit"
+    "verifyUser": "/internal/form/verify-user-submit",
+    "verifyUserConfirm": "/internal/form/verify-user-confirm-submit"
   },
   "menu": {
     "items": [

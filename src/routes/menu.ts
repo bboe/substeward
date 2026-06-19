@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
-import { buildVerifyUserForm } from '../features/verification/forms.js';
 import {
-  enqueueVerificationForComment,
-  enqueueVerificationForPost,
-} from '../features/verification/process.js';
+  buildVerifyUserForm,
+  handleVerifyCommentAuthor,
+  handleVerifyPostAuthor,
+} from '../features/verification/forms.js';
 import {
   listActiveRedditors,
   listRedditorsWithAdminRemovedItems,
@@ -29,17 +29,21 @@ menu.post('/verify-user', async (c) => {
 });
 
 menu.post('/verify-comment-author', async (c) => {
-  // Comment-level action: queue verification of the comment's author.
+  // Comment-level action: prepare verification of the comment's author.
   const request = await c.req.json<MenuItemRequest>();
-  const message = await enqueueVerificationForComment(request.targetId);
-  return c.json<UiResponse>({ showToast: message }, 200);
+  return c.json<UiResponse>(
+    await handleVerifyCommentAuthor(request.targetId),
+    200
+  );
 });
 
 menu.post('/verify-post-author', async (c) => {
-  // Post-level action: queue verification of the post's author.
+  // Post-level action: prepare verification of the post's author.
   const request = await c.req.json<MenuItemRequest>();
-  const message = await enqueueVerificationForPost(request.targetId);
-  return c.json<UiResponse>({ showToast: message }, 200);
+  return c.json<UiResponse>(
+    await handleVerifyPostAuthor(request.targetId),
+    200
+  );
 });
 
 menu.post('/list-active-users', async (c) => {

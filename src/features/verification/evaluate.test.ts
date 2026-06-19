@@ -6,6 +6,7 @@ import {
   checkStatus,
   formatDateTime,
   formatFailure,
+  formatFailureWithSummary,
   formatResults,
   markerFrom,
   mostCommon,
@@ -229,4 +230,29 @@ void test('formatFailure renders the fail message', () => {
     formatFailure('baduser', 'has 1 ban(s). Skipped history collection.'),
     'u/baduser: verification fail\n\nAccount has 1 ban(s). Skipped history collection.'
   );
+});
+
+void test('formatFailureWithSummary appends the activity summary', () => {
+  const stats = processComments(
+    [
+      comment('news', 5, '2023-01-01T00:00:00Z'),
+      comment('news', 3, '2023-02-01T00:00:00Z'),
+    ],
+    'devvit'
+  );
+  const report = formatFailureWithSummary({
+    username: 'someuser',
+    error: 'has no r/devvit history.',
+    createdAt: new Date('2018-01-01T00:00:00Z'),
+    stats,
+    noteTypeCounts: {},
+    config: CONFIG,
+  });
+
+  // Fail header is present...
+  assert.match(report, /^u\/someuser: verification fail$/m);
+  assert.match(report, /Account has no r\/devvit history\./);
+  // ...followed by the subreddit summary.
+  assert.match(report, /Commented subreddits: 1/);
+  assert.match(report, /- news \(2 comments\)/);
 });
