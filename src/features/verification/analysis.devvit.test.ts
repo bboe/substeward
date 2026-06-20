@@ -66,6 +66,30 @@ test('active-users run tallies commenters across posts and posts the report', as
   expect(body).toMatch(/u\/bob: 1/);
 });
 
+test('active-users run skips posts whose comments fail to load', async () => {
+  // A single unreadable post must not abort the whole report.
+  const cap = captureModmail();
+  vi.spyOn(reddit, 'getNewPosts').mockReturnValue({
+    all: async () => [{ id: 't3_ok' }, { id: 't3_bad' }],
+  } as never);
+  vi.spyOn(reddit, 'getComments').mockImplementation(((opts: {
+    postId: string;
+  }) => ({
+    all: async () => {
+      if (opts.postId === 't3_bad') throw new Error('parse error');
+      return [{ authorName: 'alice' }];
+    },
+  })) as never);
+
+  const runId = await startAnalysisReport('active-users');
+  await drive(runId);
+
+  expect(cap.subjects).toContain('Active users report');
+  const body = cap.bodies.join('\n');
+  expect(body).toMatch(/u\/alice: 1/);
+  expect(body).toMatch(/1 skipped/);
+});
+
 test('active-users run finalizes when there are no recent posts', async () => {
   // Guards against the no-progress loop: an empty post list must still reach
   // finalize rather than rescheduling forever (which trips the runJob limit).

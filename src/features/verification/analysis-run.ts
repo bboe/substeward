@@ -45,6 +45,8 @@ type AnalysisRunState = BaseRunState & {
   counts: Record<string, number>;
   // Posts scanned (active-users) or log entries scanned (admin-removed).
   scanned: number;
+  // active-users: posts skipped because their comments couldn't be fetched.
+  skipped: number;
   // active-users: post fullnames to scan + cursor into them.
   postIds: string[];
   postIndex: number;
@@ -67,6 +69,7 @@ export async function startAnalysisReport(kind: AnalysisKind): Promise<string> {
     updatedAtIso: nowIso,
     counts: {},
     scanned: 0,
+    skipped: 0,
     postIds: [],
     postIndex: 0,
     after: null,
@@ -126,14 +129,24 @@ async function stepScan(state: AnalysisRunState): Promise<void> {
   if (state.kind === 'active-users') {
     while (state.postIndex < state.postIds.length) {
       const postId = state.postIds[state.postIndex] as T3;
-      const authors = await fetchPostCommentAuthors(
-        postId,
-        PER_POST_COMMENT_LIMIT
-      );
-      for (const author of authors) {
-        if (isCountableAuthor(author)) {
-          state.counts[author] = (state.counts[author] ?? 0) + 1;
+      try {
+        const authors = await fetchPostCommentAuthors(
+          postId,
+          PER_POST_COMMENT_LIMIT
+        );
+        for (const author of authors) {
+          if (isCountableAuthor(author)) {
+            state.counts[author] = (state.counts[author] ?? 0) + 1;
+          }
         }
+      } catch (error) {
+        // One unreadable post (deleted, restricted, or an unexpected API
+        // response) must not abort the whole report — skip it and move on.
+        state.skipped += 1;
+        console.error(
+          `[analysis] ${state.runId}: skipping ${postId}; comment fetch failed`,
+          error
+        );
       }
       state.postIndex += 1;
       state.scanned = state.postIndex;
@@ -175,11 +188,13 @@ async function stepScan(state: AnalysisRunState): Promise<void> {
 
 async function stepFinalize(state: AnalysisRunState): Promise<void> {
   const rows = sortCounts(state.counts);
+  const skippedNote =
+    state.skipped > 0 ? ` — ${state.skipped} skipped (unreadable)` : '';
   const { subject, title } =
     state.kind === 'active-users'
       ? {
           subject: 'Active users report',
-          title: `Recently active users (last ${state.scanned} submissions)`,
+          title: `Recently active users (last ${state.scanned} submissions${skippedNote})`,
         }
       : {
           subject: 'Admin-removed items report',
