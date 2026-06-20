@@ -66,6 +66,21 @@ test('active-users run tallies commenters across posts and posts the report', as
   expect(body).toMatch(/u\/bob: 1/);
 });
 
+test('active-users run finalizes when there are no recent posts', async () => {
+  // Guards against the no-progress loop: an empty post list must still reach
+  // finalize rather than rescheduling forever (which trips the runJob limit).
+  const cap = captureModmail();
+  vi.spyOn(reddit, 'getNewPosts').mockReturnValue({
+    all: async () => [],
+  } as never);
+
+  const runId = await startAnalysisReport('active-users');
+  await drive(runId);
+
+  expect(cap.subjects).toContain('Active users report');
+  expect(cap.bodies.join('\n')).toMatch(/No matching users found/);
+});
+
 test('admin-removed run weights anti-evil removals and posts the report', async () => {
   const cap = captureModmail();
   vi.spyOn(reddit, 'getModerationLog').mockReturnValue({

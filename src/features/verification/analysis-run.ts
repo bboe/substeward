@@ -24,6 +24,9 @@ const ANALYSIS_REPORT_JOB = 'analysisReport';
 const RUN_KEY_PREFIX = 'analysis:run:';
 // Stop a step and reschedule once it passes this soft budget (30s hard limit).
 const STEP_TIME_BUDGET_MS = 20_000;
+// Space out daisy-chained steps so a fast/empty run can't exceed Devvit's
+// runJob creation limit (60 calls/minute per installation).
+const STEP_DELAY_MS = 3_000;
 const MAX_CHUNK_RETRIES = 2;
 const RUN_TTL_SECONDS = 60 * 60;
 const MOD_LOG_PAGE_SIZE = 100;
@@ -72,7 +75,7 @@ async function finishRun(runId: string): Promise<void> {
 async function scheduleStep(runId: string): Promise<void> {
   await scheduler.runJob({
     name: ANALYSIS_REPORT_JOB,
-    runAt: new Date(),
+    runAt: new Date(Date.now() + STEP_DELAY_MS),
     data: { runId },
   });
 }
@@ -160,12 +163,11 @@ async function stepScan(state: AnalysisRunState): Promise<void> {
       }
       state.postIndex += 1;
       state.scanned = state.postIndex;
-      if (state.postIndex >= state.postIds.length) {
-        done = true;
-        break;
-      }
       if (Date.now() - start > STEP_TIME_BUDGET_MS) break;
     }
+    // Done once every post has been scanned (also covers an empty post list,
+    // so the run can never reschedule forever making no progress).
+    done = state.postIndex >= state.postIds.length;
   } else {
     for (;;) {
       const page = await fetchModLogPage(

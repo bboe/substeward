@@ -43,6 +43,9 @@ const COMMENT_FETCH_LIMIT = 2100;
 const STEP_TIME_BUDGET_MS = 20_000;
 // Safety cap on pages per step regardless of timing.
 const MAX_PAGES_PER_STEP = 20;
+// Space out daisy-chained steps so a fast run can't exceed Devvit's runJob
+// creation limit (60 calls/minute per installation).
+const STEP_DELAY_MS = 3_000;
 // Retries per chunk before giving up (2 retries => up to 3 attempts).
 const MAX_CHUNK_RETRIES = 2;
 // A run with no progress for this long is considered stalled (e.g. an
@@ -124,7 +127,7 @@ async function finishRun(runId: string): Promise<void> {
 async function scheduleStep(runId: string): Promise<void> {
   await scheduler.runJob({
     name: VERIFY_USER_JOB,
-    runAt: new Date(),
+    runAt: new Date(Date.now() + STEP_DELAY_MS),
     data: { runId },
   });
 }
