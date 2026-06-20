@@ -6,6 +6,7 @@ import {
   handleVerifyPostAuthor,
 } from '../features/verification/forms.js';
 import { queueAnalysisReport } from '../features/verification/analysis-run.js';
+import { cancelBackgroundReports } from '../features/verification/cancel.js';
 import { postRecentActivity } from '../features/verification/activity.js';
 import {
   handleImportFlairMenu,
@@ -63,6 +64,18 @@ menu.post('/list-admin-removed', async (c) => {
     { showToast: await queueAnalysisReport('admin-removed') },
     200
   );
+});
+
+menu.post('/cancel-reports', async (c) => {
+  // Subreddit-level: cancel all pending verification/analysis step jobs — a
+  // kill switch for runs that are stuck or rescheduling.
+  await c.req.json<MenuItemRequest>();
+  const cancelled = await cancelBackgroundReports();
+  const message =
+    cancelled === 0
+      ? 'No running reports to cancel.'
+      : `Cancelled ${cancelled} running report job${cancelled === 1 ? '' : 's'}.`;
+  return c.json<UiResponse>({ showToast: message }, 200);
 });
 
 menu.post('/view-activity', async (c) => {

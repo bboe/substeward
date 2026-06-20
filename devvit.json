@@ -56,6 +56,13 @@
         "location": "subreddit"
       },
       {
+        "description": "Cancel any pending verification/analysis report jobs (kill switch for stuck runs).",
+        "endpoint": "/internal/menu/cancel-reports",
+        "forUserType": "moderator",
+        "label": "Cancel running reports",
+        "location": "subreddit"
+      },
+      {
         "description": "Toggle restricting this post to approved contributors (non-contributor comments are removed).",
         "endpoint": "/internal/menu/toggle-contributor-only",
         "forUserType": "moderator",
