@@ -102,7 +102,7 @@ export async function postRecentActivity(): Promise<string> {
   const events = await getRecentActivity(REPORT_EVENT_COUNT);
   const conversationId = await getExistingReportConversationId();
   const note = conversationId
-    ? `Reports are posted to: ${modmailPermalink(conversationId)} (id: ${conversationId})`
+    ? `Reports are posted to: ${modmailPermalink(conversationId)}`
     : 'No report thread has been created yet — one is created on the first verification.';
   await reddit.modMail.createModDiscussionConversation({
     subject: 'Verification activity',

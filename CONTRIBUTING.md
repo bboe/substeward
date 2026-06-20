@@ -38,14 +38,16 @@ src/
 │   │   └── actions.ts           # Toggle/import handlers + CommentCreate enforcement
 │   └── verification/
 │       ├── evaluate.ts          # Pure verification rules + report formatting (unit tested)
-│       ├── verification.ts      # Low-level Reddit fetch helpers (user/notes/comment pages)
-│       ├── run.ts               # Chunked run engine: steps, retries, watchdog
+│       ├── reddit.ts            # Low-level Reddit fetch helpers (user/notes/comment pages)
+│       ├── chunked-run.ts       # Shared daisy-chain run plumbing (store, scheduleStep, ids)
+│       ├── verification-run.ts  # Chunked verification engine: steps, retries, watchdog
 │       ├── report.ts            # Modmail report delivery + moderator alerts
 │       ├── cache.ts             # Redis recency cache (re-verify prompt)
 │       ├── process.ts           # Pre-checks (skip/confirm) + run queuing
 │       ├── forms.ts             # Verify/confirm forms + UI mapping
 │       ├── analysis.ts          # Active-users/admin-removed helpers (pure, unit tested)
 │       ├── analysis-run.ts      # Chunked background engine for the analysis reports
+│       ├── cancel.ts            # Kill switch: cancel pending report/verification jobs
 │       ├── activity.ts          # Redis-backed moderator activity feed
 │       ├── settings.ts          # Settings reading + validation
 │       └── username.ts          # Username normalization/validation
@@ -109,9 +111,11 @@ Two synchronous guards run before a run is queued:
 Devvit Web enforces a **30-second max request time** per invocation, so long histories can't be
 pulled in one job. Both verification and the analysis reports use Reddit's recommended
 **daisy-chain** pattern: process a bounded batch, persist a cursor in Redis, schedule the next step,
-stopping each step at a **soft ~20s time budget** (headroom under the 30s limit).
+stopping each step at a **soft ~20s time budget** (headroom under the 30s limit). The shared plumbing
+— the Redis-backed run store, `scheduleStep` (spaced to respect the 60 `runJob`/min creation limit),
+and run-id generation — lives in `chunked-run.ts`.
 
-- **Verification** (`run.ts`): init (account + mod notes) → fetch (pages of ~100 comments until the
+- **Verification** (`verification-run.ts`): init (account + mod notes) → fetch (pages of ~100 comments until the
   budget/page cap or the ~1000-comment ceiling) → finalize (run `evaluate.ts` rules, approve on PASS,
   deliver report).
 - **Analysis** (`analysis-run.ts`): init → scan (recent posts' commenters, or paged mod-log entries)

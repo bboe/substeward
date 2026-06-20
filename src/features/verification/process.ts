@@ -1,8 +1,8 @@
 import { reddit } from '@devvit/web/server';
 import type { T1, T3 } from '@devvit/web/shared';
 import { describeAge, getRecentVerification } from './cache.js';
-import { startVerification } from './run.js';
-import { isApprovedContributor } from './verification.js';
+import { startVerification } from './verification-run.js';
+import { isApprovedContributor } from './reddit.js';
 import { isValidUsername, normalizeUsername } from './username.js';
 
 // Outcome of preparing a verification, mapped to UI by the forms layer.

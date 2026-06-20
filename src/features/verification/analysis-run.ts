@@ -1,4 +1,4 @@
-import { reddit, redis, scheduler } from '@devvit/web/server';
+import { reddit } from '@devvit/web/server';
 import type { T3 } from '@devvit/web/shared';
 import {
   adminRemovedWeight,
@@ -11,6 +11,14 @@ import {
   sortCounts,
   type AnalysisKind,
 } from './analysis.js';
+import {
+  createRunStore,
+  MAX_CHUNK_RETRIES,
+  newRunId,
+  scheduleStep,
+  STEP_TIME_BUDGET_MS,
+  type BaseRunState,
+} from './chunked-run.js';
 import { getAnalysisSettings } from './settings.js';
 import { notifyModerators } from './report.js';
 
@@ -22,26 +30,17 @@ import { notifyModerators } from './report.js';
 // Scheduler task name; must match the task declared in devvit.json.
 const ANALYSIS_REPORT_JOB = 'analysisReport';
 const RUN_KEY_PREFIX = 'analysis:run:';
-// Stop a step and reschedule once it passes this soft budget (30s hard limit).
-const STEP_TIME_BUDGET_MS = 20_000;
-// Space out daisy-chained steps so a fast/empty run can't exceed Devvit's
-// runJob creation limit (60 calls/minute per installation).
-const STEP_DELAY_MS = 3_000;
-const MAX_CHUNK_RETRIES = 2;
-const RUN_TTL_SECONDS = 60 * 60;
 const MOD_LOG_PAGE_SIZE = 100;
 // Cap comments fetched per post so one huge thread can't blow a step's budget.
 const PER_POST_COMMENT_LIMIT = 500;
 
 type Phase = 'init' | 'scan' | 'finalize';
 
-type AnalysisRunState = {
-  runId: string;
+type AnalysisRunState = BaseRunState & {
   kind: AnalysisKind;
   phase: Phase;
   attempt: number;
   startedAtIso: string;
-  updatedAtIso: string;
   // Accumulated username -> score tally.
   counts: Record<string, number>;
   // Posts scanned (active-users) or log entries scanned (admin-removed).
@@ -53,53 +52,28 @@ type AnalysisRunState = {
   after: string | null;
 };
 
-function runKey(runId: string): string {
-  return `${RUN_KEY_PREFIX}${runId}`;
-}
-
-async function loadRun(runId: string): Promise<AnalysisRunState | null> {
-  const raw = await redis.get(runKey(runId));
-  return raw ? (JSON.parse(raw) as AnalysisRunState) : null;
-}
-
-async function saveRun(state: AnalysisRunState): Promise<void> {
-  state.updatedAtIso = new Date().toISOString();
-  await redis.set(runKey(state.runId), JSON.stringify(state));
-  await redis.expire(runKey(state.runId), RUN_TTL_SECONDS);
-}
-
-async function finishRun(runId: string): Promise<void> {
-  await redis.del(runKey(runId));
-}
-
-async function scheduleStep(runId: string): Promise<void> {
-  await scheduler.runJob({
-    name: ANALYSIS_REPORT_JOB,
-    runAt: new Date(Date.now() + STEP_DELAY_MS),
-    data: { runId },
-  });
-}
+const store = createRunStore<AnalysisRunState>({ keyPrefix: RUN_KEY_PREFIX });
 
 // Create a run and schedule its first step. Returns the new run id.
 export async function startAnalysisReport(kind: AnalysisKind): Promise<string> {
-  const now = new Date();
-  const runId = `${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const nowIso = new Date().toISOString();
+  const runId = newRunId();
   const state: AnalysisRunState = {
     runId,
     kind,
     phase: 'init',
     attempt: 0,
-    startedAtIso: now.toISOString(),
-    updatedAtIso: now.toISOString(),
+    startedAtIso: nowIso,
+    updatedAtIso: nowIso,
     counts: {},
     scanned: 0,
     postIds: [],
     postIndex: 0,
     after: null,
   };
-  await saveRun(state);
+  await store.save(state);
   console.log(`[analysis] queued ${kind} report ${runId}`);
-  await scheduleStep(runId);
+  await scheduleStep(ANALYSIS_REPORT_JOB, runId);
   return runId;
 }
 
@@ -115,7 +89,7 @@ export async function queueAnalysisReport(kind: AnalysisKind): Promise<string> {
 
 // Execute one step of a run. Invoked by the scheduler route per job.
 export async function stepAnalysisReport(runId: string): Promise<void> {
-  const state = await loadRun(runId);
+  const state = await store.load(runId);
   if (!state) {
     console.warn(`[analysis] step for unknown/finished run ${runId}`);
     return;
@@ -140,8 +114,8 @@ async function stepInit(state: AnalysisRunState): Promise<void> {
   }
   state.phase = 'scan';
   state.attempt = 0;
-  await saveRun(state);
-  await scheduleStep(state.runId);
+  await store.save(state);
+  await scheduleStep(ANALYSIS_REPORT_JOB, state.runId);
 }
 
 async function stepScan(state: AnalysisRunState): Promise<void> {
@@ -195,8 +169,8 @@ async function stepScan(state: AnalysisRunState): Promise<void> {
 
   state.attempt = 0;
   if (done) state.phase = 'finalize';
-  await saveRun(state);
-  await scheduleStep(state.runId);
+  await store.save(state);
+  await scheduleStep(ANALYSIS_REPORT_JOB, state.runId);
 }
 
 async function stepFinalize(state: AnalysisRunState): Promise<void> {
@@ -215,7 +189,7 @@ async function stepFinalize(state: AnalysisRunState): Promise<void> {
   console.log(
     `[analysis] ${state.runId}: posted ${state.kind} report (${rows.length} users, scanned ${state.scanned})`
   );
-  await finishRun(state.runId);
+  await store.finish(state.runId);
 }
 
 // Retry a failed step up to MAX_CHUNK_RETRIES; otherwise alert moderators.
@@ -229,8 +203,8 @@ async function handleStepError(
       `[analysis] ${state.runId}: '${state.phase}' attempt ${state.attempt} failed; retrying`,
       error
     );
-    await saveRun(state);
-    await scheduleStep(state.runId);
+    await store.save(state);
+    await scheduleStep(ANALYSIS_REPORT_JOB, state.runId);
     return;
   }
   console.error(
@@ -242,5 +216,5 @@ async function handleStepError(
     `The ${state.kind} report could not be completed: ${String(error)}\n\n` +
       'You can re-run it from the subreddit menu.'
   );
-  await finishRun(state.runId);
+  await store.finish(state.runId);
 }

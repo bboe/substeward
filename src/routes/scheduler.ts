@@ -1,6 +1,9 @@
 import { Hono } from 'hono';
 import type { TaskRequest, TaskResponse } from '@devvit/web/server';
-import { runWatchdog, stepVerification } from '../features/verification/run.js';
+import {
+  runWatchdog,
+  stepVerification,
+} from '../features/verification/verification-run.js';
 import { stepAnalysisReport } from '../features/verification/analysis-run.js';
 
 // Router for scheduled/queued task endpoints declared in devvit.json/scheduler.tasks.
