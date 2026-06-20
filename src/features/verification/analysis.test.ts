@@ -1,58 +1,43 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  adminRemovedWeight,
   formatCountsReport,
-  tallyAdminRemoved,
-  tallyCommentAuthors,
-  type AdminLogEntry,
+  isCountableAuthor,
+  sortCounts,
 } from './analysis.js';
 
-void test('tallyAdminRemoved weights anti-evil over admin and sorts', () => {
-  const entries: AdminLogEntry[] = [
-    {
-      moderatorName: 'Anti-Evil Operations',
-      type: 'removecomment',
-      author: 'alice',
-    },
-    { moderatorName: 'reddit', type: 'removelink', author: 'bob' },
-    { moderatorName: 'reddit', type: 'removecomment', author: 'alice' },
-    // Ignored: normal mod, not admin/anti-evil.
-    { moderatorName: 'somemod', type: 'removecomment', author: 'carol' },
-    // Ignored: non-removal action.
-    { moderatorName: 'reddit', type: 'addmoderator', author: 'dave' },
-    // Ignored: no author.
-    {
-      moderatorName: 'Anti-Evil Operations',
-      type: 'removelink',
-      author: undefined,
-    },
-  ];
-  assert.deepEqual(tallyAdminRemoved(entries), [
-    ['alice', 101],
+void test('adminRemovedWeight scores anti-evil over admin, ignores the rest', () => {
+  assert.equal(
+    adminRemovedWeight('Anti-Evil Operations', 'removecomment'),
+    100
+  );
+  assert.equal(adminRemovedWeight('reddit', 'removelink'), 1);
+  assert.equal(adminRemovedWeight('somemod', 'removecomment'), 0);
+  assert.equal(adminRemovedWeight('reddit', 'approvelink'), 0);
+});
+
+void test('isCountableAuthor skips missing and deleted authors', () => {
+  assert.equal(isCountableAuthor('alice'), true);
+  assert.equal(isCountableAuthor(undefined), false);
+  assert.equal(isCountableAuthor('[deleted]'), false);
+});
+
+void test('sortCounts orders by score desc, then username asc', () => {
+  assert.deepEqual(sortCounts({ bob: 1, alice: 2, carol: 2 }), [
+    ['alice', 2],
+    ['carol', 2],
     ['bob', 1],
   ]);
 });
 
-void test('tallyCommentAuthors counts and skips deleted/empty authors', () => {
-  assert.deepEqual(
-    tallyCommentAuthors(['alice', 'bob', 'alice', '[deleted]', undefined]),
-    [
-      ['alice', 2],
-      ['bob', 1],
-    ]
-  );
-});
-
-void test('formatCountsReport renders rows and an empty fallback', () => {
+void test('formatCountsReport renders rows and the empty state', () => {
+  assert.equal(formatCountsReport('T', []), 'T\n\nNo matching users found.');
   assert.equal(
-    formatCountsReport('Title', [
+    formatCountsReport('T', [
       ['alice', 2],
       ['bob', 1],
     ]),
-    'Title\n\n- u/alice: 2\n- u/bob: 1'
-  );
-  assert.equal(
-    formatCountsReport('Title', []),
-    'Title\n\nNo matching users found.'
+    'T\n\n- u/alice: 2\n- u/bob: 1'
   );
 });

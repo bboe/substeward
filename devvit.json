@@ -81,6 +81,9 @@
   },
   "scheduler": {
     "tasks": {
+      "analysisReport": {
+        "endpoint": "/internal/scheduler/analysis-report"
+      },
       "verificationWatchdog": {
         "cron": "*/5 * * * *",
         "endpoint": "/internal/scheduler/verification-watchdog"

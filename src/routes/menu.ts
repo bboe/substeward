@@ -5,10 +5,7 @@ import {
   handleVerifyCommentAuthor,
   handleVerifyPostAuthor,
 } from '../features/verification/forms.js';
-import {
-  listActiveRedditors,
-  listRedditorsWithAdminRemovedItems,
-} from '../features/verification/analysis.js';
+import { queueAnalysisReport } from '../features/verification/analysis-run.js';
 import { postRecentActivity } from '../features/verification/activity.js';
 import {
   handleImportFlairMenu,
@@ -51,17 +48,21 @@ menu.post('/verify-post-author', async (c) => {
 });
 
 menu.post('/list-active-users', async (c) => {
-  // Subreddit-level analysis: tally recently active commenters.
+  // Subreddit-level analysis: queue the recently-active-commenters tally.
   await c.req.json<MenuItemRequest>();
-  const message = await listActiveRedditors();
-  return c.json<UiResponse>({ showToast: message }, 200);
+  return c.json<UiResponse>(
+    { showToast: await queueAnalysisReport('active-users') },
+    200
+  );
 });
 
 menu.post('/list-admin-removed', async (c) => {
-  // Subreddit-level analysis: tally users with admin/anti-evil removals.
+  // Subreddit-level analysis: queue the admin/anti-evil removals tally.
   await c.req.json<MenuItemRequest>();
-  const message = await listRedditorsWithAdminRemovedItems();
-  return c.json<UiResponse>({ showToast: message }, 200);
+  return c.json<UiResponse>(
+    { showToast: await queueAnalysisReport('admin-removed') },
+    200
+  );
 });
 
 menu.post('/view-activity', async (c) => {
