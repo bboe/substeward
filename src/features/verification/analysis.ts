@@ -45,18 +45,51 @@ export function sortCounts(
   );
 }
 
-// Render a sorted [username, count] list as a markdown report body. Usernames
-// are wrapped in inline code so a long report renders as plain text instead of a
-// wall of user mentions.
-export function formatCountsReport(
+const USER_URL = 'https://www.reddit.com/user/';
+// Leave headroom under Reddit's 10000-char modmail body limit.
+const MAX_MESSAGE_CHARS = 9000;
+
+// Render a sorted [username, count] list as one or more Mod Discussions messages
+// (each under the body limit). The report is a markdown table with linked
+// usernames; when it spans multiple messages the title is labeled "(part i/n)"
+// and the table header is repeated so every message renders as a table.
+export function formatCountsMessages(
   title: string,
-  rows: ReadonlyArray<[string, number]>
-): string {
-  if (rows.length === 0) return `${title}\n\nNo matching users found.`;
-  const lines = rows.map(
-    ([username, count]) => `- \`u/${username}\`: ${count}`
+  rows: ReadonlyArray<[string, number]>,
+  valueLabel = 'Count'
+): string[] {
+  if (rows.length === 0) return [`${title}\n\nNo matching users found.`];
+
+  const header = `| User | ${valueLabel} |\n| --- | --- |`;
+  const rowLines = rows.map(
+    ([username, count]) =>
+      `| [u/${username}](${USER_URL}${username}) | ${count} |`
   );
-  return `${title}\n\n${lines.join('\n')}`;
+
+  // Pack rows into batches that fit alongside the title + header on each message.
+  const overhead = title.length + header.length + 40;
+  const batches: string[][] = [];
+  let current: string[] = [];
+  let length = 0;
+  for (const line of rowLines) {
+    if (
+      current.length > 0 &&
+      length + line.length + 1 + overhead > MAX_MESSAGE_CHARS
+    ) {
+      batches.push(current);
+      current = [];
+      length = 0;
+    }
+    current.push(line);
+    length += line.length + 1;
+  }
+  if (current.length > 0) batches.push(current);
+
+  const total = batches.length;
+  return batches.map((batch, index) => {
+    const heading = total > 1 ? `${title} (part ${index + 1}/${total})` : title;
+    return `${heading}\n\n${header}\n${batch.join('\n')}`;
+  });
 }
 
 // --- Reddit fetch helpers (used by the chunked engine) ---

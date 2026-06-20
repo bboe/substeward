@@ -68,8 +68,13 @@ test('active-users run tallies commenters across posts and posts the report', as
   expect(cap.subjects).toContain('Active users report');
   const body = cap.bodies.join('\n');
   expect(body).toMatch(/Recently active users/);
-  expect(body).toMatch(/`u\/alice`: 2/);
-  expect(body).toMatch(/`u\/bob`: 1/);
+  expect(body).toMatch(/\| User \| Comments \|/);
+  expect(body).toMatch(
+    /\| \[u\/alice\]\(https:\/\/www\.reddit\.com\/user\/alice\) \| 2 \|/
+  );
+  expect(body).toMatch(
+    /\[u\/bob\]\(https:\/\/www\.reddit\.com\/user\/bob\) \| 1 \|/
+  );
 });
 
 test('a large active-users report is split across multiple replies', async () => {
@@ -88,10 +93,17 @@ test('a large active-users report is split across multiple replies', async () =>
   await drive(runId);
 
   expect(cap.bodies.length).toBeGreaterThan(1);
-  for (const body of cap.bodies) expect(body.length).toBeLessThan(10000);
+  for (const body of cap.bodies) {
+    expect(body.length).toBeLessThan(10000);
+    expect(body).toMatch(/\| User \| Comments \|/); // header repeated per part
+  }
   const joined = cap.bodies.join('\n');
-  expect(joined).toMatch(/`u\/user0`: 1/);
-  expect(joined).toMatch(/`u\/user799`: 1/);
+  expect(joined).toMatch(
+    /\[u\/user0\]\(https:\/\/www\.reddit\.com\/user\/user0\)/
+  );
+  expect(joined).toMatch(
+    /\[u\/user799\]\(https:\/\/www\.reddit\.com\/user\/user799\)/
+  );
   expect(cap.bodies[0]).toMatch(/part 1\//);
 });
 
@@ -135,5 +147,8 @@ test('admin-removed run weights anti-evil removals and posts the report', async 
   expect(cap.subjects).toContain('Admin-removed items report');
   const body = cap.bodies.join('\n');
   expect(body).toMatch(/Users with admin-removed items/);
-  expect(body).toMatch(/`u\/spammer`: 101/);
+  expect(body).toMatch(/\| User \| Score \|/);
+  expect(body).toMatch(
+    /\| \[u\/spammer\]\(https:\/\/www\.reddit\.com\/user\/spammer\) \| 101 \|/
+  );
 });
