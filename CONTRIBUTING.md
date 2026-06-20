@@ -41,7 +41,8 @@ src/
 │       ├── reddit.ts            # Low-level Reddit fetch helpers (user/notes/comment pages)
 │       ├── chunked-run.ts       # Shared daisy-chain run plumbing (store, scheduleStep, ids)
 │       ├── verification-run.ts  # Chunked verification engine: steps, retries, watchdog
-│       ├── report.ts            # Modmail report delivery + moderator alerts
+│       ├── report.ts            # Verification report thread + moderator alerts
+│       ├── mod-discussion.ts    # Shared chunked Mod Discussions posting (10k-safe)
 │       ├── cache.ts             # Redis recency cache (re-verify prompt)
 │       ├── process.ts           # Pre-checks (skip/confirm) + run queuing
 │       ├── forms.ts             # Verify/confirm forms + UI mapping

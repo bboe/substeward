@@ -7,10 +7,10 @@ import {
   fetchRecentPostIds,
   formatCountsReport,
   isCountableAuthor,
-  postToModDiscussions,
   sortCounts,
   type AnalysisKind,
 } from './analysis.js';
+import { postModDiscussion } from './mod-discussion.js';
 import {
   createRunStore,
   describeError,
@@ -176,11 +176,17 @@ async function stepScan(state: AnalysisRunState): Promise<void> {
 
 async function stepFinalize(state: AnalysisRunState): Promise<void> {
   const rows = sortCounts(state.counts);
-  const title =
+  const { subject, title } =
     state.kind === 'active-users'
-      ? `Recently active users (last ${state.scanned} submissions)`
-      : `Users with admin-removed items (scanned ${state.scanned} log entries)`;
-  await postToModDiscussions(formatCountsReport(title, rows));
+      ? {
+          subject: 'Active users report',
+          title: `Recently active users (last ${state.scanned} submissions)`,
+        }
+      : {
+          subject: 'Admin-removed items report',
+          title: `Users with admin-removed items (scanned ${state.scanned} log entries)`,
+        };
+  await postModDiscussion(subject, formatCountsReport(title, rows));
   console.log(
     `[analysis] ${state.runId}: posted ${state.kind} report (${rows.length} users, scanned ${state.scanned})`
   );
