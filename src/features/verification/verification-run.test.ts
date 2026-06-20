@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isStale, shouldStopFetching } from './run.js';
+import { isStale, shouldStopFetching } from './verification-run.js';
 
 void test('shouldStopFetching stops when the limit is reached', () => {
   assert.equal(

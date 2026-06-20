@@ -1,7 +1,11 @@
 import { createDevvitTest } from '@devvit/test/server/vitest';
 import { reddit, redis } from '@devvit/web/server';
 import { expect, vi } from 'vitest';
-import { runWatchdog, startVerification, stepVerification } from './run.js';
+import {
+  runWatchdog,
+  startVerification,
+  stepVerification,
+} from './verification-run.js';
 import { getRecentVerification } from './cache.js';
 import { getRecentActivity } from './activity.js';
 

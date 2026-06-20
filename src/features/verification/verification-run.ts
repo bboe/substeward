@@ -1,4 +1,12 @@
-import { reddit, redis, scheduler } from '@devvit/web/server';
+import { reddit, redis } from '@devvit/web/server';
+import {
+  createRunStore,
+  MAX_CHUNK_RETRIES,
+  newRunId,
+  scheduleStep,
+  STEP_TIME_BUDGET_MS,
+  type BaseRunState,
+} from './chunked-run.js';
 import {
   checkComments,
   checkNotes,
@@ -18,11 +26,7 @@ import {
   getVerificationSettings,
   type VerificationSettings,
 } from './settings.js';
-import {
-  collectNoteCounts,
-  fetchCommentPage,
-  fetchUser,
-} from './verification.js';
+import { collectNoteCounts, fetchCommentPage, fetchUser } from './reddit.js';
 
 // Scheduler task name; must match the task declared in devvit.json.
 const VERIFY_USER_JOB = 'verifyUser';
@@ -38,35 +42,23 @@ const PAGE_SIZE = 100;
 // guarantees the fetch loop terminates. Set a bit above ~2000 to allow a little
 // extra history before stopping.
 const COMMENT_FETCH_LIMIT = 2100;
-// Devvit Web enforces a 30s max request time. Stop fetching and reschedule once
-// a step passes this soft budget, leaving headroom for one more page + saving.
-const STEP_TIME_BUDGET_MS = 20_000;
 // Safety cap on pages per step regardless of timing.
 const MAX_PAGES_PER_STEP = 20;
-// Space out daisy-chained steps so a fast run can't exceed Devvit's runJob
-// creation limit (60 calls/minute per installation).
-const STEP_DELAY_MS = 3_000;
-// Retries per chunk before giving up (2 retries => up to 3 attempts).
-const MAX_CHUNK_RETRIES = 2;
 // A run with no progress for this long is considered stalled (e.g. an
 // uncatchable job cancellation) and is abandoned by the watchdog.
 const STALE_MS = 5 * 60 * 1000;
-// Safety expiry on run state so abandoned keys can't linger forever.
-const RUN_TTL_SECONDS = 60 * 60;
 
 type Phase = 'init' | 'fetch' | 'finalize';
 
 // A comment reduced to what the evaluation needs, JSON-serializable for Redis.
 type StoredComment = { at: string; score: number; sub: string };
 
-type RunState = {
-  runId: string;
+type RunState = BaseRunState & {
   username: string;
   phase: Phase;
   // Retry counter for the current phase.
   attempt: number;
   startedAtIso: string;
-  updatedAtIso: string;
   // Account creation time, captured during init.
   createdAtIso: string | null;
   noteTypeCounts: Record<string, number>;
@@ -99,38 +91,12 @@ export function isStale(
 
 // --- Redis-backed run state ---
 
-function runKey(runId: string): string {
-  return `${RUN_KEY_PREFIX}${runId}`;
-}
-
-async function loadRun(runId: string): Promise<RunState | null> {
-  const raw = await redis.get(runKey(runId));
-  return raw ? (JSON.parse(raw) as RunState) : null;
-}
-
-// Persist state, refresh the active-runs heartbeat, and bound the key's TTL.
-async function saveRun(state: RunState): Promise<void> {
-  state.updatedAtIso = new Date().toISOString();
-  await redis.set(runKey(state.runId), JSON.stringify(state));
-  await redis.expire(runKey(state.runId), RUN_TTL_SECONDS);
-  await redis.zAdd(ACTIVE_RUNS_KEY, {
-    score: Date.parse(state.updatedAtIso),
-    member: state.runId,
-  });
-}
-
-async function finishRun(runId: string): Promise<void> {
-  await redis.del(runKey(runId));
-  await redis.zRem(ACTIVE_RUNS_KEY, [runId]);
-}
-
-async function scheduleStep(runId: string): Promise<void> {
-  await scheduler.runJob({
-    name: VERIFY_USER_JOB,
-    runAt: new Date(Date.now() + STEP_DELAY_MS),
-    data: { runId },
-  });
-}
+// Maintains a heartbeat in ACTIVE_RUNS_KEY on every save so the watchdog can
+// find stalled runs.
+const store = createRunStore<RunState>({
+  keyPrefix: RUN_KEY_PREFIX,
+  activeSetKey: ACTIVE_RUNS_KEY,
+});
 
 function buildConfig(
   settings: VerificationSettings,
@@ -149,31 +115,31 @@ function buildConfig(
 
 // Create a run and schedule its first step. Returns the new run id.
 export async function startVerification(username: string): Promise<string> {
-  const now = new Date();
-  const runId = `${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const nowIso = new Date().toISOString();
+  const runId = newRunId();
   const state: RunState = {
     runId,
     username,
     phase: 'init',
     attempt: 0,
-    startedAtIso: now.toISOString(),
-    updatedAtIso: now.toISOString(),
+    startedAtIso: nowIso,
+    updatedAtIso: nowIso,
     createdAtIso: null,
     noteTypeCounts: {},
     after: null,
     pagesFetched: 0,
     comments: [],
   };
-  await saveRun(state);
+  await store.save(state);
   await recordActivity({ username, status: 'queued' });
   console.log(`[verification] queued run ${runId} for u/${username}`);
-  await scheduleStep(runId);
+  await scheduleStep(VERIFY_USER_JOB, runId);
   return runId;
 }
 
 // Execute one step of a run. Invoked by the scheduler route per job.
 export async function stepVerification(runId: string): Promise<void> {
-  const state = await loadRun(runId);
+  const state = await store.load(runId);
   if (!state) {
     console.warn(`[verification] step for unknown/finished run ${runId}`);
     return;
@@ -236,8 +202,8 @@ async function stepInit(state: RunState): Promise<void> {
 
   state.phase = 'fetch';
   state.attempt = 0;
-  await saveRun(state);
-  await scheduleStep(state.runId);
+  await store.save(state);
+  await scheduleStep(VERIFY_USER_JOB, state.runId);
 }
 
 async function stepFetch(state: RunState): Promise<void> {
@@ -292,8 +258,8 @@ async function stepFetch(state: RunState): Promise<void> {
     state.phase = 'finalize';
   }
 
-  await saveRun(state);
-  await scheduleStep(state.runId);
+  await store.save(state);
+  await scheduleStep(VERIFY_USER_JOB, state.runId);
 }
 
 async function stepFinalize(state: RunState): Promise<void> {
@@ -375,7 +341,7 @@ async function stepFinalize(state: RunState): Promise<void> {
   console.log(
     `[verification] u/${state.username}: PASS (approved=${approved})`
   );
-  await finishRun(state.runId);
+  await store.finish(state.runId);
 }
 
 // Deliver a failure report, record it, and end the run. An optional report
@@ -393,7 +359,7 @@ async function finalizeFail(
   });
   await recordVerification(state.username, 'fail');
   console.log(`[verification] u/${state.username}: FAIL (${error})`);
-  await finishRun(state.runId);
+  await store.finish(state.runId);
 }
 
 // Retry a failed step up to MAX_CHUNK_RETRIES; otherwise hard-fail and notify.
@@ -404,8 +370,8 @@ async function handleStepError(state: RunState, error: unknown): Promise<void> {
       `[verification] u/${state.username}: '${state.phase}' attempt ${state.attempt} failed; retrying`,
       error
     );
-    await saveRun(state);
-    await scheduleStep(state.runId);
+    await store.save(state);
+    await scheduleStep(VERIFY_USER_JOB, state.runId);
     return;
   }
   console.error(
@@ -431,7 +397,7 @@ async function hardFail(state: RunState, reason: string): Promise<void> {
       `**Reason:** ${reason}\n\n` +
       `No approval or report was produced. You can retry the verification manually.`
   );
-  await finishRun(state.runId);
+  await store.finish(state.runId);
 }
 
 // Scan for runs that have made no progress within STALE_MS and abandon them.
@@ -449,7 +415,7 @@ export async function runWatchdog(): Promise<void> {
     `[verification] watchdog: ${stale.length} possibly-stalled run(s)`
   );
   for (const { member: runId } of stale) {
-    const state = await loadRun(runId);
+    const state = await store.load(runId);
     if (!state) {
       // State already gone; just drop the stale heartbeat entry.
       await redis.zRem(ACTIVE_RUNS_KEY, [runId]);

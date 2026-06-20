@@ -5,7 +5,7 @@ import type {
   T3,
   UiResponse,
 } from '@devvit/web/shared';
-import { isApprovedContributor } from '../verification/verification.js';
+import { isApprovedContributor } from '../verification/reddit.js';
 import {
   applyContributorOnlyFlair,
   clearContributorOnlyFlair,
