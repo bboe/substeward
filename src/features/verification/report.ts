@@ -1,10 +1,11 @@
 import { context, reddit, redis } from '@devvit/web/server';
+import { REPORT_CONVERSATION_KEY } from './keys.js';
 import { postModDiscussion } from './mod-discussion.js';
 
 // Redis key holding the auto-created modmail conversation id used for reports
 // when no conversation id is configured in settings. The settings client is
 // read-only at runtime, so we persist the conversation here instead.
-const REPORT_CONVERSATION_REDIS_KEY = 'verification:reportConversationId';
+const REPORT_CONVERSATION_REDIS_KEY = REPORT_CONVERSATION_KEY;
 
 // Build a permalink to a modmail conversation (Mod Discussions threads included).
 // The API returns ids like `ModmailConversation_3hpx0q`; the permalink wants the

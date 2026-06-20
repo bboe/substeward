@@ -49,7 +49,8 @@ src/
 │       ├── analysis.ts          # Active-users/admin-removed helpers (pure, unit tested)
 │       ├── analysis-run.ts      # Chunked background engine for the analysis reports
 │       ├── cancel.ts            # Kill switch: cancel pending report/verification jobs
-│       ├── cleanup.ts           # One-time legacy-Redis-key cleanup (on app upgrade)
+│       ├── keys.ts             # Registry of static Redis keys (source of truth)
+│       ├── cleanup.ts           # Upgrade-time key cleanup + static-key index reconcile
 │       ├── activity.ts          # Redis-backed moderator activity feed
 │       ├── settings.ts          # Settings reading + validation
 │       └── username.ts          # Username normalization/validation

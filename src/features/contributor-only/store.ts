@@ -1,10 +1,11 @@
 import { redis } from '@devvit/web/server';
+import { CONTRIBUTOR_ONLY_FLAIR_TEMPLATE_KEY } from '../verification/keys.js';
 
 // The only persisted state for contributor-only: which post-flair template
 // designates a post as contributor-only. The post's flair is the marker, so
 // there is no per-post state — but the chosen template id must live somewhere,
 // and Devvit settings are read-only at runtime, so it goes in Redis.
-const FLAIR_TEMPLATE_KEY = 'contributoronly:flairTemplateId';
+const FLAIR_TEMPLATE_KEY = CONTRIBUTOR_ONLY_FLAIR_TEMPLATE_KEY;
 
 export async function getDesignatedFlairTemplateId(): Promise<
   string | undefined
