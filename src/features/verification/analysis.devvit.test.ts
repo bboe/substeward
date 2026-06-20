@@ -62,8 +62,8 @@ test('active-users run tallies commenters across posts and posts the report', as
 
   expect(cap.subjects).toContain('Active users report');
   const body = cap.bodies.join('\n');
-  expect(body).toMatch(/u\/alice: 2/);
-  expect(body).toMatch(/u\/bob: 1/);
+  expect(body).toMatch(/`u\/alice`: 2/);
+  expect(body).toMatch(/`u\/bob`: 1/);
 });
 
 test('active-users run finalizes when there are no recent posts', async () => {
@@ -104,5 +104,5 @@ test('admin-removed run weights anti-evil removals and posts the report', async 
   await drive(runId);
 
   expect(cap.subjects).toContain('Admin-removed items report');
-  expect(cap.bodies.join('\n')).toMatch(/u\/spammer: 101/);
+  expect(cap.bodies.join('\n')).toMatch(/`u\/spammer`: 101/);
 });
