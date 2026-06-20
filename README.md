@@ -1,8 +1,9 @@
-# substeward
+# SubSteward
 
-A Reddit moderation app whose primary purpose is to facilitate contributor-only submissions: a
-moderator marks a post so that only approved contributors may comment on it. It also verifies
-redditors against configurable thresholds and approves passing accounts as subreddit contributors.
+A Reddit moderation app that adds optional contributor-only posts: a moderator can restrict an
+individual post so that only approved contributors may comment on it, and comments from everyone else
+are removed automatically. It also verifies redditors against configurable thresholds and approves
+passing accounts as subreddit contributors.
 
 ## Features
 
