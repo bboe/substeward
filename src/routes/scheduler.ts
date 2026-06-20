@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { TaskRequest, TaskResponse } from '@devvit/web/server';
 import { runWatchdog, stepVerification } from '../features/verification/run.js';
+import { stepAnalysisReport } from '../features/verification/analysis-run.js';
 
 // Router for scheduled/queued task endpoints declared in devvit.json/scheduler.tasks.
 export const schedulerRoutes = new Hono();
@@ -13,6 +14,17 @@ schedulerRoutes.post('/verify-user', async (c) => {
     await stepVerification(input.data.runId);
   } else {
     console.error('[verification] verify-user job missing runId', input.data);
+  }
+  return c.json<TaskResponse>({}, 200);
+});
+
+schedulerRoutes.post('/analysis-report', async (c) => {
+  // One step of a chunked analysis report; re-enqueued by the engine until done.
+  const input = await c.req.json<TaskRequest<{ runId?: string }>>();
+  if (input.data?.runId) {
+    await stepAnalysisReport(input.data.runId);
+  } else {
+    console.error('[analysis] analysis-report job missing runId', input.data);
   }
   return c.json<TaskResponse>({}, 200);
 });

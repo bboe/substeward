@@ -1,5 +1,12 @@
 import { context, reddit } from '@devvit/web/server';
-import { getAnalysisSettings } from './settings.js';
+import type { T3 } from '@devvit/web/shared';
+
+export type AnalysisKind = 'active-users' | 'admin-removed';
+
+// Moderator display names Reddit uses for admin/anti-evil removals.
+const ANTI_EVIL_MOD = 'Anti-Evil Operations';
+const ADMIN_MOD = 'reddit';
+const REMOVAL_TYPES = new Set(['removecomment', 'removelink']);
 
 // One moderation-log entry reduced to the fields the tally needs.
 export type AdminLogEntry = {
@@ -8,41 +15,32 @@ export type AdminLogEntry = {
   author: string | undefined;
 };
 
-// Moderator display names Reddit uses for admin/anti-evil removals.
-const ANTI_EVIL_MOD = 'Anti-Evil Operations';
-const ADMIN_MOD = 'reddit';
-const REMOVAL_TYPES = new Set(['removecomment', 'removelink']);
+// --- Pure helpers (unit tested) ---
 
-// Tally users by admin-removed items, weighting anti-evil removals heavily
-// (100) over generic admin removals (1), matching sbmod's scoring. Sorted by
-// score desc, then username asc. Pure for testability.
-export function tallyAdminRemoved(
-  entries: readonly AdminLogEntry[]
-): Array<[string, number]> {
-  const counts = new Map<string, number>();
-  for (const entry of entries) {
-    if (!entry.author || !REMOVAL_TYPES.has(entry.type)) continue;
-    let weight = 0;
-    if (entry.moderatorName === ANTI_EVIL_MOD) weight = 100;
-    else if (entry.moderatorName === ADMIN_MOD) weight = 1;
-    if (weight === 0) continue;
-    counts.set(entry.author, (counts.get(entry.author) ?? 0) + weight);
-  }
-  return [...counts.entries()].sort(
-    (a, b) => b[1] - a[1] || a[0].localeCompare(b[0])
-  );
+// Weight an admin-removed item: anti-evil removals 100, generic admin 1, else 0.
+// Matches sbmod's scoring.
+export function adminRemovedWeight(
+  moderatorName: string,
+  type: string
+): number {
+  if (!REMOVAL_TYPES.has(type)) return 0;
+  if (moderatorName === ANTI_EVIL_MOD) return 100;
+  if (moderatorName === ADMIN_MOD) return 1;
+  return 0;
 }
 
-// Tally comment authors, sorted by count desc then username asc. Pure.
-export function tallyCommentAuthors(
-  authors: readonly (string | undefined)[]
+// A real, countable author (not missing or a deleted account).
+export function isCountableAuthor(
+  author: string | undefined
+): author is string {
+  return Boolean(author) && author !== '[deleted]';
+}
+
+// Sort a username->score map by score desc, then username asc.
+export function sortCounts(
+  counts: Record<string, number>
 ): Array<[string, number]> {
-  const counts = new Map<string, number>();
-  for (const author of authors) {
-    if (!author || author === '[deleted]') continue;
-    counts.set(author, (counts.get(author) ?? 0) + 1);
-  }
-  return [...counts.entries()].sort(
+  return Object.entries(counts).sort(
     (a, b) => b[1] - a[1] || a[0].localeCompare(b[0])
   );
 }
@@ -57,8 +55,57 @@ export function formatCountsReport(
   return `${title}\n\n${lines.join('\n')}`;
 }
 
+// --- Reddit fetch helpers (used by the chunked engine) ---
+
+// Fullnames of the most recent submissions (bounded by `limit`).
+export async function fetchRecentPostIds(
+  subredditName: string,
+  limit: number
+): Promise<T3[]> {
+  const posts = await reddit.getNewPosts({ subredditName, limit }).all();
+  return posts.map((post) => post.id);
+}
+
+// Comment authors on a single post, capped so one huge thread can't blow the
+// step's time budget.
+export async function fetchPostCommentAuthors(
+  postId: T3,
+  limit: number
+): Promise<Array<string | undefined>> {
+  const comments = await reddit.getComments({ postId, limit }).all();
+  return comments.map((comment) => comment.authorName);
+}
+
+export type ModLogPage = {
+  entries: AdminLogEntry[];
+  nextAfter: string | undefined;
+  done: boolean;
+};
+
+// One page of the moderation log, with a cursor to continue from.
+export async function fetchModLogPage(
+  subredditName: string,
+  after: string | undefined,
+  pageSize: number
+): Promise<ModLogPage> {
+  const page = await reddit
+    .getModerationLog({
+      subredditName,
+      limit: pageSize,
+      ...(after ? { after } : {}),
+    })
+    .all();
+  const entries: AdminLogEntry[] = page.map((action) => ({
+    moderatorName: action.moderatorName,
+    type: action.type,
+    author: action.target?.author,
+  }));
+  const last = page[page.length - 1];
+  return { entries, nextAfter: last?.id, done: page.length < pageSize };
+}
+
 // Open a Mod Discussions conversation containing the report so all mods see it.
-async function postToModDiscussions(
+export async function postToModDiscussions(
   subject: string,
   bodyMarkdown: string
 ): Promise<void> {
@@ -67,54 +114,4 @@ async function postToModDiscussions(
     bodyMarkdown,
     subredditId: context.subredditId,
   });
-}
-
-// List redditors who have commented in the most recent submissions.
-// Bounded by analysisSubmissionLimit to stay within Devvit request limits.
-export async function listActiveRedditors(): Promise<string> {
-  const { submissionLimit } = await getAnalysisSettings();
-  const subreddit = await reddit.getCurrentSubreddit();
-
-  const posts = await reddit
-    .getNewPosts({ subredditName: subreddit.name, limit: submissionLimit })
-    .all();
-
-  const authors: Array<string | undefined> = [];
-  for (const post of posts) {
-    const comments = await post.comments.all();
-    for (const comment of comments) authors.push(comment.authorName);
-  }
-
-  const rows = tallyCommentAuthors(authors);
-  const title = `Recently active users (last ${posts.length} submissions)`;
-  await postToModDiscussions(
-    'Active users report',
-    formatCountsReport(title, rows)
-  );
-  return `Found ${rows.length} active user(s) across ${posts.length} submission(s); report posted to Mod Discussions.`;
-}
-
-// List redditors who have had submissions or comments removed by Reddit/admins.
-// Bounded by analysisModLogLimit.
-export async function listRedditorsWithAdminRemovedItems(): Promise<string> {
-  const { modLogLimit } = await getAnalysisSettings();
-  const subreddit = await reddit.getCurrentSubreddit();
-
-  const log = await reddit
-    .getModerationLog({ subredditName: subreddit.name, limit: modLogLimit })
-    .all();
-
-  const entries: AdminLogEntry[] = log.map((action) => ({
-    moderatorName: action.moderatorName,
-    type: action.type,
-    author: action.target?.author,
-  }));
-
-  const rows = tallyAdminRemoved(entries);
-  const title = `Users with admin-removed items (scanned ${log.length} log entries)`;
-  await postToModDiscussions(
-    'Admin-removed items report',
-    formatCountsReport(title, rows)
-  );
-  return `Found ${rows.length} user(s) with admin-removed items; report posted to Mod Discussions.`;
 }

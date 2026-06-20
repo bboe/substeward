@@ -53,7 +53,8 @@ src/
 │       ├── cache.ts            # Redis recency cache (re-verify prompt)
 │       ├── process.ts          # Pre-checks (skip/confirm) + run queuing
 │       ├── forms.ts            # Verify/confirm forms + UI mapping
-│       ├── analysis.ts         # Active-users + admin-removed tallies (unit tested)
+│       ├── analysis.ts         # Active-users/admin-removed helpers (pure, unit tested)
+│       ├── analysis-run.ts     # Chunked background engine for the analysis reports
 │       ├── activity.ts         # Redis-backed moderator activity feed
 │       ├── settings.ts         # Settings reading + validation
 │       └── username.ts         # Username normalization/validation
