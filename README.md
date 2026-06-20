@@ -35,7 +35,12 @@ applies your configured thresholds (account/comment age, average karma, no bans/
 passing users as contributors.
 
 Each report is posted to a **Mod Discussions** conversation that the app creates automatically the
-first time one is needed, so reports always have a destination with zero setup.
+first time one is needed, so reports always have a destination with zero setup. That thread doubles
+as an audit trail — every verification, pass or fail, is recorded there.
+
+The **View recent verification activity** menu action posts a snapshot of the latest events
+(queued, passed, failed, errored) to Mod Discussions, so you can review what the app has been doing
+at a glance.
 
 ## Analysis utilities
 
