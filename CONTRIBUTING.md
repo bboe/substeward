@@ -49,6 +49,7 @@ src/
 │       ├── analysis.ts          # Active-users/admin-removed helpers (pure, unit tested)
 │       ├── analysis-run.ts      # Chunked background engine for the analysis reports
 │       ├── cancel.ts            # Kill switch: cancel pending report/verification jobs
+│       ├── cleanup.ts           # One-time legacy-Redis-key cleanup (on app upgrade)
 │       ├── activity.ts          # Redis-backed moderator activity feed
 │       ├── settings.ts          # Settings reading + validation
 │       └── username.ts          # Username normalization/validation
@@ -57,7 +58,7 @@ src/
     ├── menu.ts                  # Menu action route handlers
     ├── scheduler.ts             # Run-step + watchdog endpoints
     ├── settings.ts             # Install setting validation endpoints
-    └── triggers.ts              # Event triggers (CommentCreate enforcement)
+    └── triggers.ts              # Event triggers (CommentCreate enforcement, AppUpgrade cleanup)
 ```
 
 ## Permissions & state

@@ -233,6 +233,7 @@
     }
   },
   "triggers": {
+    "onAppUpgrade": "/internal/triggers/app-upgrade",
     "onCommentCreate": "/internal/triggers/comment-create"
   }
 }
