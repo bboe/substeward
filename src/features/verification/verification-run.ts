@@ -8,6 +8,7 @@ import {
   STEP_TIME_BUDGET_MS,
   type BaseRunState,
 } from './chunked-run.js';
+import { ACTIVE_RUNS_KEY } from './keys.js';
 import {
   checkComments,
   checkNotes,
@@ -33,8 +34,6 @@ import { collectNoteCounts, fetchCommentPage, fetchUser } from './reddit.js';
 const VERIFY_USER_JOB = 'verifyUser';
 
 const RUN_KEY_PREFIX = 'verification:run:';
-// Sorted set of active run ids, scored by last-update time (ms) for the watchdog.
-const ACTIVE_RUNS_KEY = 'verification:runs:active';
 
 // Reddit caps a comment listing page at 100.
 const PAGE_SIZE = 100;

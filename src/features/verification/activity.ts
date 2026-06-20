@@ -1,9 +1,7 @@
 import { redis } from '@devvit/web/server';
+import { ACTIVITY_KEY } from './keys.js';
 import { getExistingReportConversationId, modmailPermalink } from './report.js';
 import { postModDiscussion } from './mod-discussion.js';
-
-// Sorted set holding recent verification events, scored by timestamp (ms).
-const ACTIVITY_KEY = 'verification:activity';
 // Cap so the feed never grows unbounded.
 const MAX_ACTIVITY_EVENTS = 100;
 // How many events the on-demand report includes.
