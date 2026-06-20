@@ -8,6 +8,9 @@
     "verifyUser": "/internal/form/verify-user-submit",
     "verifyUserConfirm": "/internal/form/verify-user-confirm-submit"
   },
+  "marketingAssets": {
+    "icon": "assets/icon.png"
+  },
   "menu": {
     "items": [
       {
