@@ -27,6 +27,18 @@ export async function isApprovedContributor(
   );
 }
 
+// True when the user is a moderator of the subreddit. Uses the username filter
+// so this is a single, cheap lookup.
+export async function isModerator(
+  subredditName: string,
+  username: string
+): Promise<boolean> {
+  const mods = await reddit.getModerators({ subredditName, username }).all();
+  return mods.some(
+    (user) => user.username.toLowerCase() === username.toLowerCase()
+  );
+}
+
 // Fetch every mod note for the user and tally counts by note type.
 export async function collectNoteCounts(
   subredditName: string,

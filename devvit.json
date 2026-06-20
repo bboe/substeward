@@ -1,5 +1,8 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "dev": {
+    "subreddit": "substeward_dev"
+  },
   "forms": {
     "verifyUser": "/internal/form/verify-user-submit",
     "verifyUserConfirm": "/internal/form/verify-user-confirm-submit"
@@ -47,6 +50,20 @@
         "forUserType": "moderator",
         "label": "View recent verification activity",
         "location": "subreddit"
+      },
+      {
+        "description": "Restrict this post to approved contributors; non-contributor comments are removed.",
+        "endpoint": "/internal/menu/mark-contributor-only",
+        "forUserType": "moderator",
+        "label": "Mark as contributor-only",
+        "location": "post"
+      },
+      {
+        "description": "Lift the contributor-only restriction on this post.",
+        "endpoint": "/internal/menu/unmark-contributor-only",
+        "forUserType": "moderator",
+        "label": "Unmark contributor-only",
+        "location": "post"
       }
     ]
   },
@@ -91,6 +108,33 @@
         "label": "Analysis — active users: submissions to scan",
         "type": "number"
       },
+      "contributorOnlyFlairBackgroundColor": {
+        "defaultValue": "#0079d3",
+        "helpText": "Background color (hex) for the contributor-only flair badge.",
+        "label": "Contributor-only — flair background color",
+        "type": "string"
+      },
+      "contributorOnlyFlairText": {
+        "defaultValue": "Contributors only",
+        "helpText": "Text shown on the contributor-only flair badge.",
+        "label": "Contributor-only — flair text",
+        "type": "string"
+      },
+      "contributorOnlyFlairTextColor": {
+        "defaultValue": "light",
+        "label": "Contributor-only — flair text color",
+        "options": [
+          { "label": "Light", "value": "light" },
+          { "label": "Dark", "value": "dark" }
+        ],
+        "type": "select"
+      },
+      "contributorOnlyRemovalMessage": {
+        "defaultValue": "Your comment was removed because the submission \"{title}\" is open to approved contributors only. If you would like to participate, ask the moderators about becoming an approved contributor.",
+        "helpText": "Modmail message sent when a comment is removed. Placeholders: {title}, {author}, {subreddit}.",
+        "label": "Contributor-only — removal message",
+        "type": "paragraph"
+      },
       "verificationMinKarmaAverage": {
         "defaultValue": 1,
         "helpText": "Reject users whose average comment score in this subreddit is below this value.",
@@ -116,7 +160,10 @@
         "helpText": "Timezone used to format dates in verification reports.",
         "label": "Verification — report timezone",
         "options": [
-          { "label": "UTC", "value": "UTC" },
+          {
+            "label": "UTC",
+            "value": "UTC"
+          },
           {
             "label": "US Eastern (America/New_York)",
             "value": "America/New_York"
@@ -153,15 +200,30 @@
             "label": "Brazil (America/Sao_Paulo)",
             "value": "America/Sao_Paulo"
           },
-          { "label": "UK (Europe/London)", "value": "Europe/London" },
-          { "label": "Central Europe (Europe/Paris)", "value": "Europe/Paris" },
+          {
+            "label": "UK (Europe/London)",
+            "value": "Europe/London"
+          },
+          {
+            "label": "Central Europe (Europe/Paris)",
+            "value": "Europe/Paris"
+          },
           {
             "label": "Eastern Europe (Europe/Athens)",
             "value": "Europe/Athens"
           },
-          { "label": "India (Asia/Kolkata)", "value": "Asia/Kolkata" },
-          { "label": "China (Asia/Shanghai)", "value": "Asia/Shanghai" },
-          { "label": "Japan (Asia/Tokyo)", "value": "Asia/Tokyo" },
+          {
+            "label": "India (Asia/Kolkata)",
+            "value": "Asia/Kolkata"
+          },
+          {
+            "label": "China (Asia/Shanghai)",
+            "value": "Asia/Shanghai"
+          },
+          {
+            "label": "Japan (Asia/Tokyo)",
+            "value": "Asia/Tokyo"
+          },
           {
             "label": "Australia Eastern (Australia/Sydney)",
             "value": "Australia/Sydney"
@@ -170,5 +232,8 @@
         "type": "select"
       }
     }
+  },
+  "triggers": {
+    "onCommentCreate": "/internal/triggers/comment-create"
   }
 }

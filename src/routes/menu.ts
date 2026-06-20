@@ -10,6 +10,10 @@ import {
   listRedditorsWithAdminRemovedItems,
 } from '../features/verification/analysis.js';
 import { postRecentActivity } from '../features/verification/activity.js';
+import {
+  handleMarkContributorOnly,
+  handleUnmarkContributorOnly,
+} from '../features/contributor-only/actions.js';
 
 // Router for menu actions declared in devvit.json/menu.items.
 export const menu = new Hono();
@@ -65,4 +69,22 @@ menu.post('/view-activity', async (c) => {
   await c.req.json<MenuItemRequest>();
   const message = await postRecentActivity();
   return c.json<UiResponse>({ showToast: message }, 200);
+});
+
+menu.post('/mark-contributor-only', async (c) => {
+  // Post-level action: flag the post as contributor-only and apply the badge.
+  const request = await c.req.json<MenuItemRequest>();
+  return c.json<UiResponse>(
+    await handleMarkContributorOnly(request.targetId),
+    200
+  );
+});
+
+menu.post('/unmark-contributor-only', async (c) => {
+  // Post-level action: clear the contributor-only flag and remove the badge.
+  const request = await c.req.json<MenuItemRequest>();
+  return c.json<UiResponse>(
+    await handleUnmarkContributorOnly(request.targetId),
+    200
+  );
 });
