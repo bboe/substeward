@@ -1,6 +1,5 @@
 import { context, reddit, redis } from '@devvit/web/server';
 import type { T3 } from '@devvit/web/shared';
-import { describeError } from './chunked-run.js';
 
 export type AnalysisKind = 'active-users' | 'admin-removed';
 
@@ -147,9 +146,12 @@ const ANALYSIS_THREAD_SUBJECT = 'SubSteward analysis reports';
 // an unparseable "struct field 'service'" error, the reply path reports it
 // plainly), so the report is pre-split into parts that each fit.
 async function deliver(messages: string[]): Promise<void> {
-  let conversationId = await redis.get(ANALYSIS_CONVERSATION_REDIS_KEY);
+  const stored = await redis.get(ANALYSIS_CONVERSATION_REDIS_KEY);
+  let conversationId: string;
   let startIndex = 0;
-  if (!conversationId) {
+  if (stored) {
+    conversationId = stored;
+  } else {
     conversationId = await reddit.modMail.createModDiscussionConversation({
       subject: ANALYSIS_THREAD_SUBJECT,
       bodyMarkdown: messages[0] as string,
@@ -169,6 +171,10 @@ async function deliver(messages: string[]): Promise<void> {
 
 // Post a report to the shared analysis Mod Discussions thread, split into parts
 // that each stay under Reddit's 10000-char modmail body limit.
+//
+// On failure this throws without clearing the stored conversation id, so the
+// engine's retries reply into the same thread instead of creating a new one each
+// time (which previously produced duplicate threads).
 export async function postToModDiscussions(
   bodyMarkdown: string
 ): Promise<void> {
@@ -176,17 +182,5 @@ export async function postToModDiscussions(
   const messages = parts.map((part, index) =>
     parts.length > 1 ? `(part ${index + 1}/${parts.length})\n\n${part}` : part
   );
-
-  try {
-    await deliver(messages);
-  } catch (error) {
-    // The stored conversation may have been deleted/archived; drop it and retry
-    // from a fresh thread.
-    console.error(
-      '[analysis] delivery failed; recreating conversation',
-      describeError(error)
-    );
-    await redis.del(ANALYSIS_CONVERSATION_REDIS_KEY);
-    await deliver(messages);
-  }
+  await deliver(messages);
 }
