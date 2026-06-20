@@ -6,8 +6,11 @@ import { context, reddit, redis } from '@devvit/web/server';
 const REPORT_CONVERSATION_REDIS_KEY = 'verification:reportConversationId';
 
 // Build a permalink to a modmail conversation (Mod Discussions threads included).
+// The API returns ids like `ModmailConversation_3hpx0q`; the permalink wants the
+// bare id, so strip the prefix.
 export function modmailPermalink(conversationId: string): string {
-  return `https://mod.reddit.com/mail/perma/${conversationId}`;
+  const id = conversationId.replace(/^ModmailConversation_/, '');
+  return `https://www.reddit.com/mail/all/${id}`;
 }
 
 // Return the auto-created report conversation id stored in Redis, or undefined
