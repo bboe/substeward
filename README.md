@@ -11,6 +11,11 @@ thresholds and, when they pass, approves them as a subreddit contributor and rec
   applies configurable thresholds (account/comment age, average karma, no bans/mutes), and approves
   passing users as contributors. Each report is posted to a Mod Discussions conversation that the
   app creates automatically the first time one is needed.
+- **Contributor-only posts**: A moderator can mark a submission contributor-only (a post menu
+  action); a `CommentCreate` trigger then removes comments from anyone who isn't an approved
+  contributor (mods/OP/bots exempt) and modmails the author the reason. A mod-only flair badge marks
+  the post and is uneditable by users. See the
+  [contributor-only feature README](src/features/contributor-only/README.md).
 - **Analysis Utilities**: Moderator menu actions to tally recently active commenters and users with
   Reddit/anti-evil removals, posting the results to Mod Discussions.
 
@@ -30,6 +35,13 @@ configuration.
 src/
 ├── index.ts                    # Server setup and route mounting
 ├── features/
+│   ├── contributor-only/        # Mark posts contributor-only; remove non-contributor comments
+│   │   ├── README.md
+│   │   ├── store.ts             # Redis flag + cached mod-only flair-template id
+│   │   ├── flair.ts             # Create/apply/clear the mod-only badge
+│   │   ├── enforce.ts           # Pure helpers (bot check, message render) — unit tested
+│   │   ├── settings.ts          # Contributor-only settings
+│   │   └── actions.ts           # Mark/unmark handlers + CommentCreate enforcement
 │   └── verification/
 │       ├── README.md
 │       ├── evaluate.ts         # Pure verification rules + report formatting (unit tested)
@@ -47,7 +59,8 @@ src/
     ├── forms.ts                # Form submit route handlers
     ├── menu.ts                 # Menu action route handlers
     ├── scheduler.ts            # Verification run-step + watchdog endpoints
-    └── settings.ts             # Install setting validation endpoints
+    ├── settings.ts             # Install setting validation endpoints
+    └── triggers.ts             # Event triggers (CommentCreate enforcement)
 ```
 
 ## Configuration
