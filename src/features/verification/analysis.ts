@@ -61,6 +61,32 @@ export function formatCountsReport(
   return `${title}\n\n${lines.join('\n')}`;
 }
 
+// Split a report into messages that each fit Reddit's modmail body limit
+// (10000 chars), breaking on line boundaries. A long report (large subreddit)
+// would otherwise be rejected. An overlong single line is hard-split as a last
+// resort; in practice lines are short ("- `u/name`: N").
+export function chunkReport(body: string, max = 9000): string[] {
+  const chunks: string[] = [];
+  let current = '';
+  const flush = (): void => {
+    if (current) chunks.push(current);
+    current = '';
+  };
+  for (const line of body.split('\n')) {
+    if (line.length > max) {
+      flush();
+      for (let i = 0; i < line.length; i += max) {
+        chunks.push(line.slice(i, i + max));
+      }
+      continue;
+    }
+    if (current && current.length + 1 + line.length > max) flush();
+    current = current ? `${current}\n${line}` : line;
+  }
+  flush();
+  return chunks.length > 0 ? chunks : [''];
+}
+
 // --- Reddit fetch helpers (used by the chunked engine) ---
 
 // Fullnames of the most recent submissions (bounded by `limit`).
@@ -113,52 +139,54 @@ export async function fetchModLogPage(
 // Redis key holding the shared analysis Mod Discussions conversation id.
 const ANALYSIS_CONVERSATION_REDIS_KEY = 'analysis:reportConversationId';
 const ANALYSIS_THREAD_SUBJECT = 'SubSteward analysis reports';
-const ANALYSIS_THREAD_INTRO =
-  'SubSteward posts analysis reports in this thread.';
 
-// Create the shared analysis conversation if it doesn't exist yet, returning its
-// id. Created with a short intro body on purpose — see postToModDiscussions.
-async function ensureAnalysisConversation(): Promise<string> {
-  const existing = await redis.get(ANALYSIS_CONVERSATION_REDIS_KEY);
-  if (existing) return existing;
-  const conversationId = await reddit.modMail.createModDiscussionConversation({
-    subject: ANALYSIS_THREAD_SUBJECT,
-    bodyMarkdown: ANALYSIS_THREAD_INTRO,
-    subredditId: context.subredditId,
-  });
-  await redis.set(ANALYSIS_CONVERSATION_REDIS_KEY, conversationId);
-  return conversationId;
+// Send the report messages to the shared analysis thread, creating it on first
+// use. The thread is created with the first message as its body (no placeholder);
+// the rest are replies. Reddit caps a modmail body at 10000 chars — exceeding it
+// is what produced the original failures (the create path surfaced the limit as
+// an unparseable "struct field 'service'" error, the reply path reports it
+// plainly), so the report is pre-split into parts that each fit.
+async function deliver(messages: string[]): Promise<void> {
+  let conversationId = await redis.get(ANALYSIS_CONVERSATION_REDIS_KEY);
+  let startIndex = 0;
+  if (!conversationId) {
+    conversationId = await reddit.modMail.createModDiscussionConversation({
+      subject: ANALYSIS_THREAD_SUBJECT,
+      bodyMarkdown: messages[0] as string,
+      subredditId: context.subredditId,
+    });
+    await redis.set(ANALYSIS_CONVERSATION_REDIS_KEY, conversationId);
+    startIndex = 1;
+  }
+  for (let i = startIndex; i < messages.length; i += 1) {
+    await reddit.modMail.reply({
+      conversationId,
+      body: messages[i] as string,
+      isInternal: true,
+    });
+  }
 }
 
-// Post a report to the shared analysis Mod Discussions thread.
-//
-// Creating a conversation whose first message is the full report triggers a
-// Devvit response-parse bug (CreateModmailConversation -> "struct field for
-// 'service' doesn't exist"), so the conversation is never created. Creating with
-// a short body and replying with the report are both unaffected — so we ensure
-// the thread exists (a short create) and then reply with the report.
+// Post a report to the shared analysis Mod Discussions thread, split into parts
+// that each stay under Reddit's 10000-char modmail body limit.
 export async function postToModDiscussions(
   bodyMarkdown: string
 ): Promise<void> {
-  let conversationId = await ensureAnalysisConversation();
+  const parts = chunkReport(bodyMarkdown);
+  const messages = parts.map((part, index) =>
+    parts.length > 1 ? `(part ${index + 1}/${parts.length})\n\n${part}` : part
+  );
+
   try {
-    await reddit.modMail.reply({
-      conversationId,
-      body: bodyMarkdown,
-      isInternal: true,
-    });
+    await deliver(messages);
   } catch (error) {
-    // The stored conversation may have been deleted/archived; recreate once.
+    // The stored conversation may have been deleted/archived; drop it and retry
+    // from a fresh thread.
     console.error(
-      '[analysis] stored conversation unusable; recreating',
+      '[analysis] delivery failed; recreating conversation',
       describeError(error)
     );
     await redis.del(ANALYSIS_CONVERSATION_REDIS_KEY);
-    conversationId = await ensureAnalysisConversation();
-    await reddit.modMail.reply({
-      conversationId,
-      body: bodyMarkdown,
-      isInternal: true,
-    });
+    await deliver(messages);
   }
 }
