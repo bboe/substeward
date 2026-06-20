@@ -11,8 +11,8 @@ import {
 } from '../features/verification/analysis.js';
 import { postRecentActivity } from '../features/verification/activity.js';
 import {
-  handleMarkContributorOnly,
-  handleUnmarkContributorOnly,
+  handleImportFlairMenu,
+  handleToggleContributorOnly,
 } from '../features/contributor-only/actions.js';
 
 // Router for menu actions declared in devvit.json/menu.items.
@@ -71,20 +71,17 @@ menu.post('/view-activity', async (c) => {
   return c.json<UiResponse>({ showToast: message }, 200);
 });
 
-menu.post('/mark-contributor-only', async (c) => {
-  // Post-level action: flag the post as contributor-only and apply the badge.
+menu.post('/toggle-contributor-only', async (c) => {
+  // Post-level action: toggle the contributor-only restriction on this post.
   const request = await c.req.json<MenuItemRequest>();
   return c.json<UiResponse>(
-    await handleMarkContributorOnly(request.targetId),
+    await handleToggleContributorOnly(request.targetId),
     200
   );
 });
 
-menu.post('/unmark-contributor-only', async (c) => {
-  // Post-level action: clear the contributor-only flag and remove the badge.
-  const request = await c.req.json<MenuItemRequest>();
-  return c.json<UiResponse>(
-    await handleUnmarkContributorOnly(request.targetId),
-    200
-  );
+menu.post('/import-contributor-only-flair', async (c) => {
+  // Subreddit-level action: adopt an existing post-flair template as the marker.
+  await c.req.json<MenuItemRequest>();
+  return c.json<UiResponse>(await handleImportFlairMenu(), 200);
 });

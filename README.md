@@ -11,10 +11,11 @@ thresholds and, when they pass, approves them as a subreddit contributor and rec
   applies configurable thresholds (account/comment age, average karma, no bans/mutes), and approves
   passing users as contributors. Each report is posted to a Mod Discussions conversation that the
   app creates automatically the first time one is needed.
-- **Contributor-only posts**: A moderator can mark a submission contributor-only (a post menu
-  action); a `CommentCreate` trigger then removes comments from anyone who isn't an approved
-  contributor (mods/OP/bots exempt) and modmails the author the reason. A mod-only flair badge marks
-  the post and is uneditable by users. See the
+- **Contributor-only posts**: A moderator toggles a submission contributor-only — which applies a
+  mod-only post-flair template that acts as the marker. A `CommentCreate` trigger then removes
+  comments on flaired posts from anyone who isn't an approved contributor (bots are exempt, and the
+  OP by default via a setting; moderators are not) and modmails the author the reason. An import
+  action adopts an existing flair template for subreddits migrating off an AutoMod rule. See the
   [contributor-only feature README](src/features/contributor-only/README.md).
 - **Analysis Utilities**: Moderator menu actions to tally recently active commenters and users with
   Reddit/anti-evil removals, posting the results to Mod Discussions.
@@ -37,11 +38,11 @@ src/
 ├── features/
 │   ├── contributor-only/        # Mark posts contributor-only; remove non-contributor comments
 │   │   ├── README.md
-│   │   ├── store.ts             # Redis flag + cached mod-only flair-template id
+│   │   ├── store.ts             # The one Redis key: designated flair-template id
 │   │   ├── flair.ts             # Create/apply/clear the mod-only badge
 │   │   ├── enforce.ts           # Pure helpers (bot check, message render) — unit tested
 │   │   ├── settings.ts          # Contributor-only settings
-│   │   └── actions.ts           # Mark/unmark handlers + CommentCreate enforcement
+│   │   └── actions.ts           # Toggle/import handlers + CommentCreate enforcement
 │   └── verification/
 │       ├── README.md
 │       ├── evaluate.ts         # Pure verification rules + report formatting (unit tested)

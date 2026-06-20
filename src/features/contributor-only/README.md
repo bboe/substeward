@@ -2,43 +2,57 @@
 
 Lets moderators restrict an individual submission so that **only approved
 contributors may comment** — replacing the older "set a flair, let AutoMod
-enforce it" workflow with a one-click action owned entirely by the app.
+enforce it" workflow with the same flair-driven model, owned by the app.
 
-## How it works
+## The flair is the marker
 
-- **Mark / Unmark** (post moderator menu actions): mark stores the post id in
-  Redis and applies a **mod-only** post-flair badge; unmark clears both.
-- The flair is created from an app-managed **mod-only flair template** (created
-  once, id cached in Redis). `modOnly: true` is what makes the badge uneditable
-  by the OP / regular users — only moderators can change it (a platform rule;
-  there is no per-post flair lock on Reddit).
-- The flair is only a **visible badge**. The Redis flag is the source of truth
-  for enforcement, so changing the flair never bypasses the restriction.
+A post is contributor-only **iff it wears the designated mod-only post-flair
+template**. There is no per-post database — the post's flair _is_ the state. The
+only persisted value is the **designated template id** (one Redis key; Devvit
+settings are read-only at runtime, so an app-chosen value can't live there).
+
+Because the template is `modOnly`, only moderators can add or remove it, so the
+flair-as-marker model can't be bypassed by users.
+
+## Actions
+
+- **Toggle contributor-only** (post, moderator): applies the designated template
+  (creating it with a default label on first use) or removes it.
+- **Import contributor-only flair** (subreddit, moderator): pick an existing
+  post-flair template to designate as the marker — for subreddits transitioning
+  from an AutoModerator flair rule. The chosen template is **forced to mod-only**
+  so the marker stays bypass-safe. **Posts already wearing that flair are
+  enforced immediately**, with no backfill.
+
+The badge's appearance is **not** a setting — moderators customize the template
+directly in the subreddit's post flair settings; edits persist (same id).
 
 ## Enforcement
 
-A `CommentCreate` trigger fires on every new comment. Unflagged posts
-short-circuit on a single Redis lookup. On a flagged post, a comment is removed
-unless its author is exempt:
+A `CommentCreate` trigger reads the post's flair template id **from the trigger
+payload** (`post.linkFlair.templateId`), so posts that don't wear the designated
+template short-circuit with **no API calls**. On a contributor-only post a
+comment is removed unless its author is exempt:
 
 - a **bot** account (`AutoModerator`, `reddit`),
-- an **approved contributor**,
-- a **moderator**, or
-- the **OP** (post author).
+- an **approved contributor**, or
+- the **OP** — when the "exempt the OP" setting is on (default).
 
-A removed comment's author is sent the configured removal reason via modmail.
+Moderators are **not** automatically exempt — a moderator must explicitly be an
+approved contributor. Removed comments' authors get the configured reason via
+modmail.
 
 ## Settings (`Contributor-only —` group)
 
-- flair text, background color, text color (light/dark) for the badge
 - removal message (modmail body); placeholders: `{title}`, `{author}`,
   `{subreddit}`
+- exempt the OP (boolean, default on)
 
 ## Files
 
-- `store.ts` — Redis flag + cached flair-template id
+- `store.ts` — the one Redis key: the designated flair-template id
 - `flair.ts` — create/apply/clear the mod-only badge
 - `enforce.ts` — pure helpers (`isBotAccount`, `renderRemovalMessage`), unit
   tested
 - `settings.ts` — reads the contributor-only settings
-- `actions.ts` — mark/unmark menu handlers + the `CommentCreate` handler
+- `actions.ts` — toggle + import handlers and the `CommentCreate` handler
