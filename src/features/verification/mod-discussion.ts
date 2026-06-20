@@ -43,6 +43,17 @@ export async function postModDiscussion(
   const messages = parts.map((part, index) =>
     parts.length > 1 ? `(part ${index + 1}/${parts.length})\n\n${part}` : part
   );
+  await postModDiscussionParts(subject, messages);
+}
+
+// Post pre-built messages: create the thread with the first, reply the rest.
+// Use this when the caller has already split the content into ready-to-send
+// messages that each fit the 10000-char limit (e.g. a table with its header
+// repeated on every part).
+export async function postModDiscussionParts(
+  subject: string,
+  messages: string[]
+): Promise<void> {
   const conversationId = await reddit.modMail.createModDiscussionConversation({
     subject,
     bodyMarkdown: messages[0] as string,
