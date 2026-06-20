@@ -1,8 +1,8 @@
 # substeward
 
-A Reddit moderation app built on [Devvit Web](https://developers.reddit.com/). It is a Devvit port of
-the [`sbmod`](https://github.com/bboe/sbmod) Python/PRAW bot: it verifies a redditor's history against configurable
-thresholds and, when they pass, approves them as a subreddit contributor and records a report.
+A Reddit moderation app whose primary purpose is to facilitate contributor-only submissions: a
+moderator marks a post so that only approved contributors may comment on it. It also verifies
+redditors against configurable thresholds and approves passing accounts as subreddit contributors.
 
 ## Features
 
