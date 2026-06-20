@@ -4,6 +4,7 @@
     "subreddit": "substeward_dev"
   },
   "forms": {
+    "importContributorOnlyFlair": "/internal/form/import-flair-submit",
     "verifyUser": "/internal/form/verify-user-submit",
     "verifyUserConfirm": "/internal/form/verify-user-confirm-submit"
   },
@@ -52,18 +53,18 @@
         "location": "subreddit"
       },
       {
-        "description": "Restrict this post to approved contributors; non-contributor comments are removed.",
-        "endpoint": "/internal/menu/mark-contributor-only",
+        "description": "Toggle restricting this post to approved contributors (non-contributor comments are removed).",
+        "endpoint": "/internal/menu/toggle-contributor-only",
         "forUserType": "moderator",
-        "label": "Mark as contributor-only",
+        "label": "Toggle contributor-only",
         "location": "post"
       },
       {
-        "description": "Lift the contributor-only restriction on this post.",
-        "endpoint": "/internal/menu/unmark-contributor-only",
+        "description": "Adopt an existing post-flair template as the contributor-only marker.",
+        "endpoint": "/internal/menu/import-contributor-only-flair",
         "forUserType": "moderator",
-        "label": "Unmark contributor-only",
-        "location": "post"
+        "label": "Import contributor-only flair",
+        "location": "subreddit"
       }
     ]
   },
@@ -108,26 +109,11 @@
         "label": "Analysis — active users: submissions to scan",
         "type": "number"
       },
-      "contributorOnlyFlairBackgroundColor": {
-        "defaultValue": "#0079d3",
-        "helpText": "Background color (hex) for the contributor-only flair badge.",
-        "label": "Contributor-only — flair background color",
-        "type": "string"
-      },
-      "contributorOnlyFlairText": {
-        "defaultValue": "Contributors only",
-        "helpText": "Text shown on the contributor-only flair badge.",
-        "label": "Contributor-only — flair text",
-        "type": "string"
-      },
-      "contributorOnlyFlairTextColor": {
-        "defaultValue": "light",
-        "label": "Contributor-only — flair text color",
-        "options": [
-          { "label": "Light", "value": "light" },
-          { "label": "Dark", "value": "dark" }
-        ],
-        "type": "select"
+      "contributorOnlyExemptOp": {
+        "defaultValue": true,
+        "helpText": "When enabled, the post author can always comment on their own contributor-only post.",
+        "label": "Contributor-only — exempt the original poster (OP)",
+        "type": "boolean"
       },
       "contributorOnlyRemovalMessage": {
         "defaultValue": "Your comment was removed because the submission \"{title}\" is open to approved contributors only. If you would like to participate, ask the moderators about becoming an approved contributor.",
