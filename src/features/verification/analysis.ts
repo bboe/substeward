@@ -46,12 +46,19 @@ export function sortCounts(
 }
 
 // Render a sorted [username, count] list as a markdown report body.
+//
+// Usernames are wrapped in inline code rather than written as raw `u/name`
+// mentions. A rendered user mention makes Reddit return a modmail-creation
+// response that the Devvit client can't parse ("struct field for 'service'"),
+// which fails the whole report; inline code renders as plain text and avoids it.
 export function formatCountsReport(
   title: string,
   rows: ReadonlyArray<[string, number]>
 ): string {
   if (rows.length === 0) return `${title}\n\nNo matching users found.`;
-  const lines = rows.map(([username, count]) => `- u/${username}: ${count}`);
+  const lines = rows.map(
+    ([username, count]) => `- \`u/${username}\`: ${count}`
+  );
   return `${title}\n\n${lines.join('\n')}`;
 }
 

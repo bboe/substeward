@@ -38,6 +38,6 @@ void test('formatCountsReport renders rows and the empty state', () => {
       ['alice', 2],
       ['bob', 1],
     ]),
-    'T\n\n- u/alice: 2\n- u/bob: 1'
+    'T\n\n- `u/alice`: 2\n- `u/bob`: 1'
   );
 });
