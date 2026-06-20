@@ -24,6 +24,31 @@ export function newRunId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Fully serialize an error for logging. gRPC failures from the Devvit client
+// carry useful fields (`code`, `details`, `metadata`) that a plain String(error)
+// drops; capture them so failures like the "struct field" response-parse error
+// are debuggable. Note: the raw response body is parsed inside the Devvit client
+// and is not exposed on the thrown error, so `details` is the most we can get.
+export function describeError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const e = error as Error & {
+    code?: unknown;
+    details?: unknown;
+    metadata?: { getMap?: () => unknown };
+  };
+  const info: Record<string, unknown> = { name: e.name, message: e.message };
+  if (e.code !== undefined) info.code = e.code;
+  if (e.details !== undefined) info.details = e.details;
+  const metadata = e.metadata?.getMap?.();
+  if (metadata && Object.keys(metadata).length > 0) info.metadata = metadata;
+  if (e.stack) info.stack = e.stack;
+  try {
+    return JSON.stringify(info);
+  } catch {
+    return String(error);
+  }
+}
+
 // Enqueue the next step of a run, spaced to respect the runJob creation limit.
 export async function scheduleStep(
   jobName: string,
