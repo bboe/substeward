@@ -1,5 +1,6 @@
-import { context, reddit, redis } from '@devvit/web/server';
+import { redis } from '@devvit/web/server';
 import { getExistingReportConversationId, modmailPermalink } from './report.js';
+import { postModDiscussion } from './mod-discussion.js';
 
 // Sorted set holding recent verification events, scored by timestamp (ms).
 const ACTIVITY_KEY = 'verification:activity';
@@ -104,10 +105,9 @@ export async function postRecentActivity(): Promise<string> {
   const note = conversationId
     ? `Reports are posted to: ${modmailPermalink(conversationId)}`
     : 'No report thread has been created yet — one is created on the first verification.';
-  await reddit.modMail.createModDiscussionConversation({
-    subject: 'Verification activity',
-    bodyMarkdown: formatActivityReport(events, note),
-    subredditId: context.subredditId,
-  });
+  await postModDiscussion(
+    'Verification activity',
+    formatActivityReport(events, note)
+  );
   return `Posted the latest ${events.length} verification event(s) to Mod Discussions.`;
 }

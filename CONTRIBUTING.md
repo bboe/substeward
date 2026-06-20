@@ -41,13 +41,15 @@ src/
 │       ├── reddit.ts            # Low-level Reddit fetch helpers (user/notes/comment pages)
 │       ├── chunked-run.ts       # Shared daisy-chain run plumbing (store, scheduleStep, ids)
 │       ├── verification-run.ts  # Chunked verification engine: steps, retries, watchdog
-│       ├── report.ts            # Modmail report delivery + moderator alerts
+│       ├── report.ts            # Verification report thread + moderator alerts
+│       ├── mod-discussion.ts    # Shared chunked Mod Discussions posting (10k-safe)
 │       ├── cache.ts             # Redis recency cache (re-verify prompt)
 │       ├── process.ts           # Pre-checks (skip/confirm) + run queuing
 │       ├── forms.ts             # Verify/confirm forms + UI mapping
 │       ├── analysis.ts          # Active-users/admin-removed helpers (pure, unit tested)
 │       ├── analysis-run.ts      # Chunked background engine for the analysis reports
 │       ├── cancel.ts            # Kill switch: cancel pending report/verification jobs
+│       ├── cleanup.ts           # One-time legacy-Redis-key cleanup (on app upgrade)
 │       ├── activity.ts          # Redis-backed moderator activity feed
 │       ├── settings.ts          # Settings reading + validation
 │       └── username.ts          # Username normalization/validation
@@ -56,7 +58,7 @@ src/
     ├── menu.ts                  # Menu action route handlers
     ├── scheduler.ts             # Run-step + watchdog endpoints
     ├── settings.ts             # Install setting validation endpoints
-    └── triggers.ts              # Event triggers (CommentCreate enforcement)
+    └── triggers.ts              # Event triggers (CommentCreate enforcement, AppUpgrade cleanup)
 ```
 
 ## Permissions & state

@@ -65,6 +65,7 @@ test('active-users run tallies commenters across posts and posts the report', as
   const runId = await startAnalysisReport('active-users');
   await drive(runId);
 
+  expect(cap.subjects).toContain('Active users report');
   const body = cap.bodies.join('\n');
   expect(body).toMatch(/Recently active users/);
   expect(body).toMatch(/`u\/alice`: 2/);
@@ -105,6 +106,7 @@ test('active-users run finalizes when there are no recent posts', async () => {
   const runId = await startAnalysisReport('active-users');
   await drive(runId);
 
+  expect(cap.subjects).toContain('Active users report');
   expect(cap.bodies.join('\n')).toMatch(/No matching users found/);
 });
 
@@ -130,6 +132,7 @@ test('admin-removed run weights anti-evil removals and posts the report', async 
   const runId = await startAnalysisReport('admin-removed');
   await drive(runId);
 
+  expect(cap.subjects).toContain('Admin-removed items report');
   const body = cap.bodies.join('\n');
   expect(body).toMatch(/Users with admin-removed items/);
   expect(body).toMatch(/`u\/spammer`: 101/);

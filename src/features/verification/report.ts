@@ -1,4 +1,5 @@
 import { context, reddit, redis } from '@devvit/web/server';
+import { postModDiscussion } from './mod-discussion.js';
 
 // Redis key holding the auto-created modmail conversation id used for reports
 // when no conversation id is configured in settings. The settings client is
@@ -67,9 +68,5 @@ export async function notifyModerators(
   subject: string,
   bodyMarkdown: string
 ): Promise<void> {
-  await reddit.modMail.createModDiscussionConversation({
-    subject,
-    bodyMarkdown,
-    subredditId: context.subredditId,
-  });
+  await postModDiscussion(subject, bodyMarkdown);
 }
