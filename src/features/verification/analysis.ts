@@ -1,5 +1,6 @@
-import { context, reddit } from '@devvit/web/server';
+import { context, reddit, redis } from '@devvit/web/server';
 import type { T3 } from '@devvit/web/shared';
+import { describeError } from './chunked-run.js';
 
 export type AnalysisKind = 'active-users' | 'admin-removed';
 
@@ -45,12 +46,10 @@ export function sortCounts(
   );
 }
 
-// Render a sorted [username, count] list as a markdown report body.
-//
-// Usernames are wrapped in inline code rather than written as raw `u/name`
-// mentions. A rendered user mention makes Reddit return a modmail-creation
-// response that the Devvit client can't parse ("struct field for 'service'"),
-// which fails the whole report; inline code renders as plain text and avoids it.
+// Render a sorted [username, count] list as a markdown report body. Usernames
+// are wrapped in inline code so a long report renders as plain text instead of a
+// wall of user mentions. (The report is delivered via reply, not by creating a
+// conversation with this body — see postToModDiscussions for why that matters.)
 export function formatCountsReport(
   title: string,
   rows: ReadonlyArray<[string, number]>
@@ -111,14 +110,55 @@ export async function fetchModLogPage(
   return { entries, nextAfter: last?.id, done: page.length < pageSize };
 }
 
-// Open a Mod Discussions conversation containing the report so all mods see it.
-export async function postToModDiscussions(
-  subject: string,
-  bodyMarkdown: string
-): Promise<void> {
-  await reddit.modMail.createModDiscussionConversation({
-    subject,
-    bodyMarkdown,
+// Redis key holding the shared analysis Mod Discussions conversation id.
+const ANALYSIS_CONVERSATION_REDIS_KEY = 'analysis:reportConversationId';
+const ANALYSIS_THREAD_SUBJECT = 'SubSteward analysis reports';
+const ANALYSIS_THREAD_INTRO =
+  'SubSteward posts analysis reports in this thread.';
+
+// Create the shared analysis conversation if it doesn't exist yet, returning its
+// id. Created with a short intro body on purpose — see postToModDiscussions.
+async function ensureAnalysisConversation(): Promise<string> {
+  const existing = await redis.get(ANALYSIS_CONVERSATION_REDIS_KEY);
+  if (existing) return existing;
+  const conversationId = await reddit.modMail.createModDiscussionConversation({
+    subject: ANALYSIS_THREAD_SUBJECT,
+    bodyMarkdown: ANALYSIS_THREAD_INTRO,
     subredditId: context.subredditId,
   });
+  await redis.set(ANALYSIS_CONVERSATION_REDIS_KEY, conversationId);
+  return conversationId;
+}
+
+// Post a report to the shared analysis Mod Discussions thread.
+//
+// Creating a conversation whose first message is the full report triggers a
+// Devvit response-parse bug (CreateModmailConversation -> "struct field for
+// 'service' doesn't exist"), so the conversation is never created. Creating with
+// a short body and replying with the report are both unaffected — so we ensure
+// the thread exists (a short create) and then reply with the report.
+export async function postToModDiscussions(
+  bodyMarkdown: string
+): Promise<void> {
+  let conversationId = await ensureAnalysisConversation();
+  try {
+    await reddit.modMail.reply({
+      conversationId,
+      body: bodyMarkdown,
+      isInternal: true,
+    });
+  } catch (error) {
+    // The stored conversation may have been deleted/archived; recreate once.
+    console.error(
+      '[analysis] stored conversation unusable; recreating',
+      describeError(error)
+    );
+    await redis.del(ANALYSIS_CONVERSATION_REDIS_KEY);
+    conversationId = await ensureAnalysisConversation();
+    await reddit.modMail.reply({
+      conversationId,
+      body: bodyMarkdown,
+      isInternal: true,
+    });
+  }
 }

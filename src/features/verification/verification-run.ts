@@ -1,6 +1,7 @@
 import { reddit, redis } from '@devvit/web/server';
 import {
   createRunStore,
+  describeError,
   MAX_CHUNK_RETRIES,
   newRunId,
   scheduleStep,
@@ -368,7 +369,7 @@ async function handleStepError(state: RunState, error: unknown): Promise<void> {
   if (state.attempt <= MAX_CHUNK_RETRIES) {
     console.error(
       `[verification] u/${state.username}: '${state.phase}' attempt ${state.attempt} failed; retrying`,
-      error
+      describeError(error)
     );
     await store.save(state);
     await scheduleStep(VERIFY_USER_JOB, state.runId);
@@ -376,7 +377,7 @@ async function handleStepError(state: RunState, error: unknown): Promise<void> {
   }
   console.error(
     `[verification] u/${state.username}: '${state.phase}' failed permanently after ${state.attempt} attempts`,
-    error
+    describeError(error)
   );
   await hardFail(
     state,

@@ -13,6 +13,7 @@ import {
 } from './analysis.js';
 import {
   createRunStore,
+  describeError,
   MAX_CHUNK_RETRIES,
   newRunId,
   scheduleStep,
@@ -175,17 +176,11 @@ async function stepScan(state: AnalysisRunState): Promise<void> {
 
 async function stepFinalize(state: AnalysisRunState): Promise<void> {
   const rows = sortCounts(state.counts);
-  const { subject, title } =
+  const title =
     state.kind === 'active-users'
-      ? {
-          subject: 'Active users report',
-          title: `Recently active users (last ${state.scanned} submissions)`,
-        }
-      : {
-          subject: 'Admin-removed items report',
-          title: `Users with admin-removed items (scanned ${state.scanned} log entries)`,
-        };
-  await postToModDiscussions(subject, formatCountsReport(title, rows));
+      ? `Recently active users (last ${state.scanned} submissions)`
+      : `Users with admin-removed items (scanned ${state.scanned} log entries)`;
+  await postToModDiscussions(formatCountsReport(title, rows));
   console.log(
     `[analysis] ${state.runId}: posted ${state.kind} report (${rows.length} users, scanned ${state.scanned})`
   );
@@ -201,7 +196,7 @@ async function handleStepError(
   if (state.attempt <= MAX_CHUNK_RETRIES) {
     console.error(
       `[analysis] ${state.runId}: '${state.phase}' attempt ${state.attempt} failed; retrying`,
-      error
+      describeError(error)
     );
     await store.save(state);
     await scheduleStep(ANALYSIS_REPORT_JOB, state.runId);
@@ -209,7 +204,7 @@ async function handleStepError(
   }
   console.error(
     `[analysis] ${state.runId}: '${state.phase}' failed permanently`,
-    error
+    describeError(error)
   );
   await notifyModerators(
     '⚠️ Analysis report failed',

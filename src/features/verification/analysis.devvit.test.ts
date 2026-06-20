@@ -12,18 +12,20 @@ const test = createDevvitTest();
 type Capture = { subjects: string[]; bodies: string[] };
 
 function captureModmail(): Capture {
+  // The report is delivered by creating the thread once (short intro body) and
+  // then replying with the report, so the report text lands in `bodies` via the
+  // reply, and the thread subject is captured on create.
   const cap: Capture = { subjects: [], bodies: [] };
   vi.spyOn(reddit, 'getCurrentSubreddit').mockResolvedValue({
     name: 'testsub',
   } as never);
   vi.spyOn(reddit, 'modMail', 'get').mockReturnValue({
-    createModDiscussionConversation: async (p: {
-      subject: string;
-      bodyMarkdown: string;
-    }) => {
+    createModDiscussionConversation: async (p: { subject: string }) => {
       cap.subjects.push(p.subject);
-      cap.bodies.push(p.bodyMarkdown);
       return 'ModmailConversation_x';
+    },
+    reply: async (p: { body: string }) => {
+      cap.bodies.push(p.body);
     },
   } as never);
   return cap;
@@ -60,8 +62,8 @@ test('active-users run tallies commenters across posts and posts the report', as
   const runId = await startAnalysisReport('active-users');
   await drive(runId);
 
-  expect(cap.subjects).toContain('Active users report');
   const body = cap.bodies.join('\n');
+  expect(body).toMatch(/Recently active users/);
   expect(body).toMatch(/`u\/alice`: 2/);
   expect(body).toMatch(/`u\/bob`: 1/);
 });
@@ -77,7 +79,6 @@ test('active-users run finalizes when there are no recent posts', async () => {
   const runId = await startAnalysisReport('active-users');
   await drive(runId);
 
-  expect(cap.subjects).toContain('Active users report');
   expect(cap.bodies.join('\n')).toMatch(/No matching users found/);
 });
 
@@ -103,6 +104,7 @@ test('admin-removed run weights anti-evil removals and posts the report', async 
   const runId = await startAnalysisReport('admin-removed');
   await drive(runId);
 
-  expect(cap.subjects).toContain('Admin-removed items report');
-  expect(cap.bodies.join('\n')).toMatch(/`u\/spammer`: 101/);
+  const body = cap.bodies.join('\n');
+  expect(body).toMatch(/Users with admin-removed items/);
+  expect(body).toMatch(/`u\/spammer`: 101/);
 });
