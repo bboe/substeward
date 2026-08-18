@@ -22,7 +22,8 @@ Once a post is contributor-only, any comment is removed unless its author is an 
 contributor**, a **bot** (`AutoModerator`/`reddit`), or the **OP** (when the "exempt the OP" setting
 is on — the default). Moderators are _not_ automatically exempt; add a moderator as an approved
 contributor if they should be able to comment. Removed commenters receive the configured reason via
-modmail.
+modmail. That conversation is **archived immediately**, so routine removals stay out of the modmail
+inbox — if the commenter replies, Reddit moves the thread back into the inbox for you to handle.
 
 To change the badge's label or color, edit the template directly in your subreddit's post-flair
 settings.

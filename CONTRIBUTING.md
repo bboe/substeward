@@ -86,7 +86,9 @@ trigger payload** (`post.linkFlair.templateId`), so posts that don't wear the de
 short-circuit with **no API calls**. On a contributor-only post a comment is removed unless its author
 is a bot (`AutoModerator`/`reddit`), an approved contributor, or the OP (when the "exempt the OP"
 setting is on). Moderators are **not** automatically exempt. Removed authors get the configured reason
-via modmail.
+via modmail; the conversation is archived right after it is created so the inbox only surfaces threads
+the commenter actually replied to (Reddit unarchives on a participant reply). Read state is per
+moderator, so an archived-but-unread notice can still count toward the Archived unread badge.
 
 ## Verification internals
 

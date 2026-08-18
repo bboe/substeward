@@ -163,12 +163,18 @@ export async function handleCommentCreate(
     subreddit: subredditName,
   });
   try {
-    await reddit.modMail.createConversation({
+    const { conversation } = await reddit.modMail.createConversation({
       subredditName,
       subject: 'Your comment was removed',
       body,
       to: username,
     });
+    // Archive the notice right away so routine removals don't pile up in the
+    // modmail inbox. Reddit moves a conversation back out of Archived when the
+    // participant replies, so only threads that need a mod stay visible.
+    if (conversation.id) {
+      await reddit.modMail.archiveConversation(conversation.id);
+    }
   } catch (error) {
     console.error(`[contributor-only] failed to modmail u/${username}`, error);
   }
