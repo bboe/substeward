@@ -20,6 +20,7 @@ const DESIGNATED = 'tmpl_co';
 type Capture = {
   removed: string[];
   modmail: Array<{ to?: string | null; body: string }>;
+  archived: string[];
 };
 
 function stubReddit(
@@ -28,7 +29,7 @@ function stubReddit(
     postFlairTemplateId?: string;
   } = {}
 ): Capture {
-  const capture: Capture = { removed: [], modmail: [] };
+  const capture: Capture = { removed: [], modmail: [], archived: [] };
 
   vi.spyOn(reddit, 'getCurrentSubreddit').mockResolvedValue({
     name: 'testsub',
@@ -53,6 +54,10 @@ function stubReddit(
   vi.spyOn(reddit, 'modMail', 'get').mockReturnValue({
     createConversation: async (p: { to?: string | null; body: string }) => {
       capture.modmail.push({ to: p.to, body: p.body });
+      return { conversation: { id: 'ModmailConversation_abc' } };
+    },
+    archiveConversation: async (id: string) => {
+      capture.archived.push(id);
     },
   } as never);
 
@@ -124,6 +129,7 @@ test('non-contributor comment on a contributor-only post is removed and modmaile
   expect(capture.removed).toContain('t1_c');
   expect(capture.modmail).toHaveLength(1);
   expect(capture.modmail[0]?.to).toBe('bob');
+  expect(capture.archived).toEqual(['ModmailConversation_abc']);
 });
 
 test('approved contributor comment is kept', async () => {
